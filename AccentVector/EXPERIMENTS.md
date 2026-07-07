@@ -9,9 +9,14 @@ all `rq*` modules run on the Mac against the grid's audio.
 | ID | What | How |
 |----|------|-----|
 | A0 | One LoRA fine-tune → one vector per accent `{british, spanish, vietnamese, +1 distant}` | `scripts/finetune.sh` (set LoRA config) → `scripts/extract_vector.sh` |
-| A1 | Synthesis grid: accent × α sweep, fixed neutral reference | `python -m accent_vector.experiments.grid --config grid.json` |
+| A1 | Synthesis grid: accent × α sweep, **fixed neutral** reference (isolates the vector) | `python -m accent_vector.experiments.grid --config grid.json` |
 | A2 | Natural target-accent clips + GAE baseline clips (per accent) | data collection; endpoints for gap-closure / cs_accent |
-| A3 | Control: base F5 + non-English reference, no vector | `infer_accent --ckpt <base> ...` (paper's "Pretrained") |
+| A3 | Reference-leakage ablation: same grid with **per-accent L1** reference | `grid --config grid.json --reference-mode matched` |
+
+**Reference leakage (A3):** F5 clones the reference's own accent, so the matched-vs-fixed
+gap at α=0 measures how much accent the reference alone supplies — separating it from the
+vector's contribution. `matched` mode writes to `results/<accent>__matchedref/`; each accent's
+L1 reference goes in the config's `references` block.
 
 ## Experiments (CPU / Mac, over the A1 grid)
 
