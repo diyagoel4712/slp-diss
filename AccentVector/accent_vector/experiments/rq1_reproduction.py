@@ -1,22 +1,31 @@
-"""[E1.1-1.2] RQ1 -- cross-backbone reproduction.
+"""[E1.1-1.4] RQ1 -- cross-backbone reproduction, incl. RQ1b language leakage.
 
 Over one accent's alpha sweep, measure whether accent strength rises
-monotonically with alpha while speaker identity is retained, and track the
-content/language-leakage signal (WER) that the missing language-ID token on F5
-is predicted to worsen at high alpha.
+monotonically with alpha while speaker identity is retained, and instrument the
+language-leakage that the missing language-ID token on F5 is predicted to worsen
+at high alpha.
 
     accent strength : cs_accent (GenAID embedding cosine to natural target)
                       + aid_acc (GenAID label accuracy)
     identity        : speaker_similarity to the fixed neutral reference
-    leakage         : wer vs the held-out English transcripts
+    leakage [RQ1b]  : wer vs the held-out English transcripts, and -- when a LID
+                      predictor is wired -- P(English) from a spoken-LID model
+    leakage onset   : the alpha at which WER crosses a threshold (rising) or
+                      P(English) drops below one (falling); compare to XTTS
 
 Monotonicity is summarised with Spearman rho over alpha (H1: rho > 0 for accent,
-~0 for speaker similarity).
+~0 for speaker similarity). Leakage onset makes the "how far can you scale before
+content leaves English" question a single comparable number (RQ1b).
+
+The LID signal is an optional hook: if evaluation_functions exposes
+``predict_lid_english(wavs) -> [{'p_english': float}, ...]`` (e.g. wrapping
+speechbrain/lang-id-voxlingua107-ecapa in its isolated env) it is used; otherwise
+the eng_lid column is nan and only the WER-based onset is reported.
 
     python -m accent_vector.experiments.rq1_reproduction \
         --sweep-dir results/british --transcripts transcripts/eval_transcripts.txt \
         --ref-wav refs/neutral.wav --accent-ref /data/vctk_england_clips \
-        --target-accent English --out-csv results/british/rq1.csv
+        --target-accent English --lid --out-csv results/british/rq1.csv
 """
 
 import argparse
@@ -37,10 +46,27 @@ def _spearman(xs, ys):
     return float(np.corrcoef(rx, ry)[0, 1])
 
 
-def run(sweep_dir, transcripts, ref_wav, accent_refs, target_accent, device, out_csv):
+def _english_lid(ef, wavs):
+    """Mean P(English) from a wired spoken-LID predictor, or nan if none is
+    available. Wire ``ef.predict_lid_english(wavs) -> [{'p_english': float}]``
+    (e.g. speechbrain/lang-id-voxlingua107-ecapa in the isolated env)."""
+    import numpy as np
+    fn = getattr(ef, "predict_lid_english", None)
+    if fn is None:
+        return float("nan")
+    preds = fn(wavs)
+    return float(np.mean([p["p_english"] for p in preds]))
+
+
+def run(sweep_dir, transcripts, ref_wav, accent_refs, target_accent, device, out_csv,
+        lid=False, wer_leak_threshold=0.5, lid_leak_threshold=0.5):
     ef = common.load_eval()
     tx = [ln.strip() for ln in Path(transcripts).read_text().splitlines() if ln.strip()] if transcripts else []
     refs = common.wavs_in(accent_refs) if accent_refs else None
+    lid_available = lid and getattr(ef, "predict_lid_english", None) is not None
+    if lid and not lid_available:
+        print("[rq1] --lid requested but evaluation_functions has no predict_lid_english; "
+              "eng_lid will be nan (WER-based onset still reported)")
 
     rows = []
     for alpha, d in common.alpha_dirs(sweep_dir):
@@ -57,15 +83,25 @@ def run(sweep_dir, transcripts, ref_wav, accent_refs, target_accent, device, out
             errs = [ef.wer(w, tx[common.utt_index(w)]) for w in wavs
                     if common.utt_index(w) is not None and common.utt_index(w) < len(tx)]
             row["wer"] = sum(errs) / len(errs) if errs else float("nan")
+        if lid:
+            row["eng_lid"] = _english_lid(ef, wavs)  # P(English); falls as content leaks
         rows.append(row)
         print(f"[rq1] alpha={alpha}: {row}")
 
     alphas = [r["alpha"] for r in rows]
     summary = {}
-    for key in ("accent_cs", "accent_acc", "spk_sim", "wer"):
+    for key in ("accent_cs", "accent_acc", "spk_sim", "wer", "eng_lid"):
         if all(key in r for r in rows):
             summary[f"spearman_{key}"] = _spearman(alphas, [r[key] for r in rows])
-    print(f"[rq1] monotonicity (Spearman vs alpha): {summary}")
+
+    # RQ1b: leakage onset -- how far the vector scales before content leaves English.
+    if all("wer" in r for r in rows):
+        summary["wer_leak_onset"] = common.leakage_onset(
+            alphas, [r["wer"] for r in rows], wer_leak_threshold, rising=True)
+    if lid_available:
+        summary["lid_leak_onset"] = common.leakage_onset(
+            alphas, [r["eng_lid"] for r in rows], lid_leak_threshold, rising=False)
+    print(f"[rq1] monotonicity + leakage onset: {summary}")
 
     fields = sorted({k for r in rows for k in r}, key=lambda k: (k != "alpha", k))
     Path(out_csv).parent.mkdir(parents=True, exist_ok=True)
@@ -85,9 +121,17 @@ def main():
     p.add_argument("--accent-ref", help="dir of natural target-accent clips (cs_accent)")
     p.add_argument("--target-accent")
     p.add_argument("--device", default="cpu")
+    p.add_argument("--lid", action="store_true",
+                   help="measure P(English) per alpha via ef.predict_lid_english (RQ1b)")
+    p.add_argument("--wer-leak-threshold", type=float, default=0.5,
+                   help="WER above which content is treated as leaked (rising onset)")
+    p.add_argument("--lid-leak-threshold", type=float, default=0.5,
+                   help="P(English) below which content is treated as leaked (falling onset)")
     p.add_argument("--out-csv", required=True)
     a = p.parse_args()
-    run(a.sweep_dir, a.transcripts, a.ref_wav, a.accent_ref, a.target_accent, a.device, a.out_csv)
+    run(a.sweep_dir, a.transcripts, a.ref_wav, a.accent_ref, a.target_accent, a.device,
+        a.out_csv, lid=a.lid, wer_leak_threshold=a.wer_leak_threshold,
+        lid_leak_threshold=a.lid_leak_threshold)
 
 
 if __name__ == "__main__":

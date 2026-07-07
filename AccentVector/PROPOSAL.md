@@ -24,8 +24,19 @@ and prosody" but never measures whether it does — and its evaluation instrumen
 - **RQ1 — Cross-backbone generalisation.** Does task-vector accent control
   transfer from XTTS (autoregressive codec) to **F5-TTS (flow-matching)**, which
   has **no language-ID token**? *H1:* mechanism transfers (α-monotonic accent,
-  speaker retained), but content/language leakage at high α is worse than XTTS
-  without the language anchor.
+  speaker retained). Tested by the accent-strength-vs-α monotonicity + speaker
+  retention — the shape of the paper's Fig. 3 reproduced on a new backbone.
+- **RQ1b — Language leakage and the language-ID anchor.** Because F5 has no
+  language-ID token to hold content in English, does content drift toward the
+  target *language* (not just accent) sooner than on XTTS? *H1b:* leakage sets in
+  at lower α on F5. Measured by (i) WER vs α, (ii) P(English) from a spoken-LID
+  model vs α — the direct drift signal, distinct from accent — and (iii) a single
+  **leakage-onset α** (where WER crosses / P(English) drops below a threshold),
+  compared to the paper's XTTS numbers. WER alone conflates drift with the ASR's
+  accent penalty, so **relative WER** (RQ5) and the LID signal disambiguate.
+  *Confound (stated as a limitation):* F5-vs-XTTS varies backbone **and** token
+  together; the clean isolation — ablating the token *within* XTTS — needs XTTS
+  re-stood-up and is out of scope, so the onset gap is evidence, not proof.
 - **RQ2 — Geometry.** Do vectors cluster by linguistic family, and how much is
   accent vs training-corpus confound? *H2:* weight-space similarity partially
   recovers accent relatedness; RSA vs output-space (GenAID) is positive but

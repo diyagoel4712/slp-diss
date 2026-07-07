@@ -24,6 +24,8 @@ L1 reference goes in the config's `references` block.
 |----|----|--------|--------|------------------------|
 | E1.1 | RQ1 | `rq1_reproduction` | `rq1.csv` | accent ↑ monotonic with α (Spearman>0), spk-sim flat/high |
 | E1.2 | RQ1 | `rq1_reproduction` (wer col) | `rq1.csv` | WER rises with α faster than paper's XTTS (leakage) |
+| E1.3 | RQ1b | `rq1_reproduction --lid` (eng_lid col) | `rq1.csv` | P(English) falls with α — direct language drift, distinct from accent |
+| E1.4 | RQ1b | `rq1_reproduction` (leak-onset in footer) | `rq1.csv` | leakage-onset α lower on F5 than XTTS (missing language anchor) |
 | E2.1 | RQ2 | `rq2_geometry` | `weight_space_cosine.csv`, `..._mds.csv` | accents cluster by family in MDS |
 | E2.2 | RQ2 | `rq2_geometry` (--synth) | `output_space_cosine.csv`, `rsa_mantel.txt` | Mantel r>0, p<0.05 but r<1 (imperfect) |
 | E2.3 | RQ2 | `rq2_geometry` (within- vs cross-English) | matrices | corpus contributes measurable distance |
@@ -41,8 +43,14 @@ L1 reference goes in the config's `references` block.
 
 ## Not yet wired (documented integration points)
 
-- **LID probability** (E1.2 complementary signal) — VoxLingua107; the eval suite
-  has no LID. WER carries the leakage signal meanwhile.
+- **LID probability** (E1.3) — `rq1_reproduction --lid` has the hook; it calls
+  `evaluation_functions.predict_lid_english` if present. Wire that to
+  VoxLingua107 (`speechbrain/lang-id-voxlingua107-ecapa`) in the isolated env to
+  activate the eng_lid column and the LID-based leakage onset. Until then WER
+  carries the leakage signal and the WER-based onset still reports.
+- **XTTS token ablation** (RQ1b clean isolation) — out of scope here (needs XTTS
+  re-stood-up); the F5-vs-XTTS onset gap confounds backbone with the missing
+  language-ID token, so report it as evidence, not proof. See PROPOSAL.md RQ1b.
 - **Forced-alignment rhythm** (%V, ΔC, nPVI) — `rq3` ships a voicing-based proxy
   from `extract_f0`; swap in MFA vowel/consonant intervals for the rigorous form.
 - **Reference retrieval** (E4.2) — adapt `SOTA_models_experiments/select_utterances.py`.

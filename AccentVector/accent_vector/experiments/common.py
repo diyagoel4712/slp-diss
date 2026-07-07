@@ -181,6 +181,31 @@ def gap_closure_distance(d_base_to_natural, d_alpha_to_natural):
     return float(1.0 - d_alpha_to_natural / d_base_to_natural)
 
 
+# --- language leakage onset (RQ1b) ------------------------------------------
+def leakage_onset(alphas, signal, threshold, rising=True):
+    """Linearly-interpolated alpha at which a leakage signal first crosses a
+    threshold -- how far the vector can be scaled before content leaves the base
+    language / intelligibility collapses (RQ1b).
+
+    rising=True  : onset where the signal climbs past threshold (e.g. WER).
+    rising=False : onset where the signal drops below threshold (e.g. P(English)).
+    Returns the crossing alpha, the lowest alpha if already past it there, or nan
+    if it never crosses. None alphas and nan signal values are dropped.
+    """
+    pts = sorted((a, s) for a, s in zip(alphas, signal)
+                 if a is not None and s is not None and not np.isnan(s))
+    if not pts:
+        return float("nan")
+    first_a, first_s = pts[0]
+    if (rising and first_s > threshold) or (not rising and first_s < threshold):
+        return float(first_a)  # already leaking at the baseline
+    for (a0, s0), (a1, s1) in zip(pts, pts[1:]):
+        if (rising and s0 <= threshold < s1) or (not rising and s0 >= threshold > s1):
+            frac = 0.0 if s1 == s0 else (threshold - s0) / (s1 - s0)
+            return float(a0 + frac * (a1 - a0))
+    return float("nan")
+
+
 # --- speaker metadata (RQ5.1 gender split) ----------------------------------
 def vctk_gender_map(vctk_root):
     """speaker_id -> 'M'/'F' from VCTK speaker-info.txt."""
