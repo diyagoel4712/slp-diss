@@ -57,6 +57,12 @@ path (recommended — see deviation #2) you need this fork's `F5TTS_v1_LoRA`
 config; **stock `SWivid/F5-TTS` has no LoRA**, so only use it if you stick to the
 full fine-tune.
 
+> **Provenance of `F5-TTS/` (gitignored, not vendored).** It is the `f5_tts_lora`
+> subdirectory of <https://github.com/the-bird-F/Expressive-Vectors>, itself a
+> fork of <https://github.com/SWivid/F5-TTS> that adds LoRA (MIT licensed). To
+> reconstruct it: clone Expressive-Vectors and move `f5_tts_lora` to `F5-TTS/`.
+> (A copy of this note also lives in `F5-TTS/PROVENANCE.md`.)
+
 ```bash
 conda create -n f5-tts python=3.11 -y && conda activate f5-tts
 pip install torch==2.4.0+cu124 torchaudio==2.4.0+cu124 \
