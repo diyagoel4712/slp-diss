@@ -1,8 +1,8 @@
 """Accent-controlled inference with F5-TTS (paper Section 3.4 + Figure 3).
 
 For each strength coefficient alpha, we build theta_pre + alpha * tau_accent and
-synthesize a fixed set of English transcripts. The reference clip is held
-**fixed and neutral** across all alpha, so the accent vector is the only thing
+synthesize a fixed set of English transcripts (input text to be synthesised). The 
+reference clip is held **fixed and neutral** across all alpha, so the accent vector is the only thing
 that varies -- this isolates "accent from the vector" and makes the alpha sweep
 interpretable (F5 clones the reference's own accent, so a varying reference
 would confound the sweep; see ADAPTATION_PLAN.md gotcha #3).

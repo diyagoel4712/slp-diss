@@ -139,25 +139,51 @@ def extract(pretrained_path, finetuned_path, out_path, verbose=True):
 
 
 # --- Eq. 4-6: build an accent-modified model --------------------------------
-def compose(pretrained_path, vectors, out_path, verbose=True):
-    """theta_pre + sum_i alpha_i * tau_i.
+def _key_selected(key, include, exclude):
+    """Layer masking: keep ``key`` iff it matches an include substring (when the
+    include list is non-empty) and no exclude substring. Enables scaling only a
+    subset of layers -- the primitive behind layer localisation (RQ3.4) and
+    layer-targeted scaling (RQ4)."""
+    if include and not any(s in key for s in include):
+        return False
+    if exclude and any(s in key for s in exclude):
+        return False
+    return True
 
-    ``vectors`` is a list of ``(vector_path, alpha)``. A single pair with
-    alpha in [0, 1] realises the strength sweep (Eq. 4); several pairs realise
-    mixed-accent composition (Eq. 5-6). alpha == 0 for a single vector
+
+def compose(pretrained_path, vectors, out_path, include=None, exclude=None, verbose=True):
+    """theta_pre + sum_i alpha_i * tau_i, optionally over a subset of layers.
+
+    ``vectors`` is a list of ``(vector_path, alpha)`` or
+    ``(vector_path, alpha, per_vector_include)``. A single pair with alpha in
+    [0, 1] realises the strength sweep (Eq. 4); several pairs realise
+    mixed-accent composition (Eq. 5-6). alpha == 0 for a single unmasked vector
     reproduces the pretrained model exactly (the sweep's baseline).
+
+    ``include`` / ``exclude`` are lists of substrings matched against flattened
+    parameter keys; a per-vector include (3rd tuple element) overrides the
+    global ``include`` for that vector. Keys not selected keep their pretrained
+    value, so a mask scales only the chosen layers and leaves the rest at
+    theta_pre.
     """
     result = load_flat_checkpoint(pretrained_path)  # start from theta_pre
-    for vector_path, alpha in vectors:
+    for spec in vectors:
+        vector_path, alpha = spec[0], spec[1]
+        inc = spec[2] if len(spec) > 2 and spec[2] is not None else include
         tau = load_flat_checkpoint(vector_path)
-        applied = 0
+        applied = skipped_mask = 0
         for key, delta in tau.items():
-            if key in result and isinstance(result[key], torch.Tensor):
-                result[key] = result[key].float() + alpha * delta.float()
-                applied += 1
-            elif verbose:
-                print(f"[compose] vector key not in base, skipping: {key}")
-        print(f"[compose] applied {vector_path} with alpha={alpha} ({applied} tensors)")
+            if key not in result or not isinstance(result[key], torch.Tensor):
+                if verbose:
+                    print(f"[compose] vector key not in base, skipping: {key}")
+                continue
+            if not _key_selected(key, inc, exclude):
+                skipped_mask += 1
+                continue
+            result[key] = result[key].float() + alpha * delta.float()
+            applied += 1
+        mask_note = f", {skipped_mask} masked out" if (inc or exclude) else ""
+        print(f"[compose] applied {vector_path} alpha={alpha} ({applied} tensors{mask_note})")
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     torch.save(unflatten_state_dict(result), out_path)
     print(f"[compose] saved accent-modified model -> {out_path}")
@@ -184,6 +210,10 @@ def _build_parser():
         help="strength coefficient for the corresponding --vector; repeat to match",
     )
     p_co.add_argument("--out", required=True, help="output path for the accent-modified model")
+    p_co.add_argument("--include", action="append", default=[],
+                      help="only scale layers whose key contains this substring (repeatable)")
+    p_co.add_argument("--exclude", action="append", default=[],
+                      help="never scale layers whose key contains this substring (repeatable)")
     return parser
 
 
@@ -197,7 +227,8 @@ def main():
                 f"got {len(args.vector)} --vector but {len(args.alpha)} --alpha; "
                 "they must be paired one-to-one"
             )
-        compose(args.pretrained, list(zip(args.vector, args.alpha)), args.out)
+        compose(args.pretrained, list(zip(args.vector, args.alpha)), args.out,
+                include=args.include or None, exclude=args.exclude or None)
 
 
 if __name__ == "__main__":
