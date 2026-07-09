@@ -233,6 +233,10 @@ vctk/
 SOTA_models_experiments/CosyVoice3/
 SOTA_models_experiments/coqui/
 SOTA_models_experiments/vits/
+SOTA_models_experiments/GenAID/
+CLARITY/
+F5-TTS/                    # LoRA-capable F5-TTS fork (relocated from Expressive-Vectors)
+Expressive-Vectors/       # removed; kept ignored in case of re-clone
 
 # Model checkpoints / weights (in case any live outside the clones)
 **/pretrained_models/

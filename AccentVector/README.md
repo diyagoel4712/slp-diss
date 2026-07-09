@@ -49,22 +49,24 @@ against the installed F5-TTS:
 ## Setup (training needs a CUDA GPU)
 
 Training is infeasible on CPU/Mac (F5-TTS pins `torch==2.4.0+cu124`; the paper
-used an A40). **Evaluation runs on the Mac.** Reuse the sibling
-`Expressive-Vectors` F5-TTS or clone fresh:
+used an A40). **Evaluation runs on the Mac.**
+
+F5-TTS lives at the repo-root **`F5-TTS/`** (the LoRA-capable fork). The scripts
+default `F5_ROOT` to `../F5-TTS`; override it to point elsewhere. For the LoRA
+path (recommended — see deviation #2) you need this fork's `F5TTS_v1_LoRA`
+config; **stock `SWivid/F5-TTS` has no LoRA**, so only use it if you stick to the
+full fine-tune.
 
 ```bash
-# F5-TTS source + pretrained base checkpoint + data/vocab.txt
-git clone --recurse-submodules https://github.com/SWivid/F5-TTS.git
 conda create -n f5-tts python=3.11 -y && conda activate f5-tts
 pip install torch==2.4.0+cu124 torchaudio==2.4.0+cu124 \
   --extra-index-url https://download.pytorch.org/whl/cu124
 cd F5-TTS && pip install -e . && cd ..
-# download the base checkpoint to F5-TTS/ckpts/F5TTS_v1_Base/model_1250000.pt
+# put the base checkpoint at F5-TTS/ckpts/F5TTS_v1_Base/model_1250000.pt
+# and the pretrained data/vocab.txt under F5-TTS/data/
 ```
 
-Point the scripts at that tree by exporting `F5_ROOT` (defaults to
-`../Expressive-Vectors/F5-TTS`). Every stage puts the F5 source and this package
-on `PYTHONPATH` for you.
+Every stage puts `$F5_ROOT/src` and this package on `PYTHONPATH` for you.
 
 ## Pipeline (Phase A: British-accented English)
 
