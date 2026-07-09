@@ -38,8 +38,12 @@ L1 reference goes in the config's `references` block.
 | E5.1 | RQ5 | `rq5_bias` (gender rows) | `rq5.csv` | metrics differ by gender |
 | E5.2 | RQ5 | `rq5_bias` (wer_relative) | `rq5.csv` | relative WER < absolute WER (ASR bias share) |
 | E5.3 | RQ5 | flowchart | figure | — (deliverable) |
+| E6.1 | RQ6 | `rq_temporal` | `temporal.csv` | `cos(τ_t, τ_final)` converges before magnitude (direction learnable early) |
 
-`*` RQ4 is the stretch tier.
+`*` RQ4 is the stretch tier. **E6.1 is Tier-1 only** (optimisation trajectory,
+near-free): needs intermediate `model_<step>.pt` checkpoints saved during A0.
+The data-efficiency variant (Tier 2/3: separate LoRAs on data fractions with
+error bounds) is out of scope — step ≠ data amount.
 
 ## Not yet wired (documented integration points)
 
