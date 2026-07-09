@@ -216,3 +216,34 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ============================================================
+# Project-specific (slp-diss): datasets, weights, clones, outputs
+# ============================================================
+
+# macOS cruft
+.DS_Store
+
+# Raw datasets / corpora (VCTK etc.) — far too large for git
+Datasets/
+vctk/
+
+# Third-party model repos cloned for experiments (each has its own .git;
+# re-clone from source rather than vendoring them here)
+SOTA_models_experiments/CosyVoice3/
+SOTA_models_experiments/coqui/
+SOTA_models_experiments/vits/
+
+# Model checkpoints / weights (in case any live outside the clones)
+**/pretrained_models/
+*.pth
+*.ckpt
+*.safetensors
+*.pt
+*.bin
+*.onnx
+
+# Generated audio outputs
+outputs/
+*.wav
+*.flac
