@@ -50,6 +50,14 @@ and prosody" but never measures whether it does — and its evaluation instrumen
   yes, without collapsing speaker similarity.
 - **RQ5 — Evaluation bias.** Where does bias enter, and does a fairer protocol
   (relative WER, gender-disaggregated, familiarity-baselined) change conclusions?
+- **RQ6 — Fine-tuning trajectory (optional, Tier 1).** How does the accent vector
+  form over training? Track `‖τ_t‖` and `cos(τ_t, τ_final)` across checkpoints.
+  *H6:* the accent **direction** stabilises well before magnitude — so the
+  direction is learnable from little optimisation and α supplies the remaining
+  intensity. This is the *optimisation* trajectory (near-free: CPU vector math
+  over checkpoints already saved); the *data-efficiency* question (separate LoRAs
+  on data fractions, with error bounds) is Tier 2/3 and **out of scope** — step ≠
+  data amount, since F5 fine-tunes many epochs over one corpus.
 
 ## Method
 
