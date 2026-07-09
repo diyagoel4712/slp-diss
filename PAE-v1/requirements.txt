@@ -1,0 +1,24 @@
+# Core
+torch>=2.1.0
+torchaudio>=2.1.0
+transformers>=4.38.0
+
+# Phonological feature extraction
+praat-parselmouth>=0.4.3   # Python interface to Praat
+praatio>=6.0.0             # TextGrid parsing (MFA output)
+
+# Forced alignment
+# Montreal Forced Aligner must be installed separately:
+#   conda install -c conda-forge montreal-forced-aligner
+# OR: pip install montreal-forced-aligner (experimental)
+
+# Training utilities
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Visualisation (optional, for embed.py --plot)
+umap-learn>=0.5.5
+matplotlib>=3.7.0
+
+# Evaluation / probing (optional)
+scikit-learn>=1.3.0
