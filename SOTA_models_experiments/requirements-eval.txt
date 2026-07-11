@@ -1,0 +1,29 @@
+# Evaluation metrics environment (".conda", Python 3.11)
+# Used by evaluation_functions.py for the metrics that run natively:
+#   #2 F0 RMSE, #3 MCD, #4 WER, #7 PPG-KL
+# (#5 AccentID, #6 CS-accent, #8 speaker-sim run in the separate genaid env --
+#  see requirements-genaid.txt. #1 UTMOS uses utmosv2 from the root pyproject.toml.)
+#
+# Install into the .conda env:
+#   uv pip install --python /path/to/.conda/bin/python -r requirements-eval.txt
+# (or: pip install -r requirements-eval.txt  with that env active)
+#
+# Versions pinned to what was verified working on 2026-06-15 (macOS, CPU).
+
+librosa==0.11.0           # F0 (pyin, cents) + audio loading
+jiwer==4.0.0              # WER (note: 4.x uses reference_transform, not truth_transform)
+openai-whisper==20250625  # WER hypotheses + EnglishTextNormalizer
+transformers==5.12.1      # PPG-KL phoneme model (facebook/wav2vec2-lv-60-espeak-cv-ft)
+soundfile==0.14.0         # wav I/O for librosa
+numpy==2.4.6
+pandas==3.0.3             # results table + aggregation in run_evaluation.ipynb
+torch==2.12.0             # backs whisper + transformers (CPU build is fine)
+
+# MCD (#3): WORLD spectral envelope -> mel-cepstrum, DTW-aligned (literature-scale dB).
+# NB: pyworld has no macOS-arm64 pip wheel and fails to build against the conda clang
+# toolchain ('algorithm' header not found) -- install it from conda-forge FIRST:
+#   conda install -p /path/to/.conda -c conda-forge pyworld=0.3.5
+# then the pip deps below (pymcd then sees pyworld already satisfied):
+pymcd==0.2.1              # MCD toolbox (Calculate_MCD, MCD_mode="dtw")
+pysptk==1.0.1             # mel-cepstral coefficients (pymcd dependency)
+fastdtw==0.3.4            # DTW alignment used by pymcd
