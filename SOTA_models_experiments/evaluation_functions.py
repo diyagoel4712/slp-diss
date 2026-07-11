@@ -19,36 +19,65 @@ def f0_rmse(synthesised_audio_file, ground_truth_audio_file, **kwargs):
     Root mean squared error (RMSE) in the fundamental frequency (F0) of synthesised speech and natural speech from corpus.
     Helps detect errors in prosody prediction.
 
-    F0 is warped to the mel scale (librosa.hz_to_mel, HTK formula) before the error is taken, so the RMSE reflects perceptual 
-    pitch distance rather than raw Hz. Only frames voiced in BOTH signals contribute.
+    The two F0 contours are DTW-aligned first (synth and reference are different recordings
+    with different onset/rate/duration, so frame i of one does NOT correspond to frame i of
+    the other -- a fixed truncation compares mismatched phones). The error is then taken in
+    cents, a log-pitch scale on which equal pitch *ratios* (octaves) count equally, matching
+    how pitch is perceived. Only aligned pairs voiced in BOTH contours contribute.
 
     IN: str: path to synthesised audio file,
         str: path to ground truth audio file
         **kwargs: passed through to extract_f0 (sr, fmin, fmax, hop_length, ...)
-    OUT: float: mel-scale F0 RMSE (np.nan if no commonly-voiced frames)
+    OUT: float: F0 RMSE in cents (np.nan if no commonly-voiced aligned frames)
     """
     import numpy as np
-    import librosa
 
     synth_f0 = extract_f0(synthesised_audio_file, **kwargs)
     natural_f0 = extract_f0(ground_truth_audio_file, **kwargs)
 
-    # align lengths: same utterance, slightly different durations -> truncate to minimum.
-    # NB: look into DTW-alignment if durations are drastically different (which they shouldn't be! --
-    # if your synth and natural speech durations are super different, you have bigger problems to worry about.)
-    n = min(len(synth_f0), len(natural_f0))
-    synth_f0, natural_f0 = synth_f0[:n], natural_f0[:n]
+    # DTW-align the contours so we compare matching phones, not frames that drift apart
+    # with any onset/rate difference.
+    wp = _align_f0(synth_f0, natural_f0)
+    synth_aligned = synth_f0[wp[:, 0]]
+    natural_aligned = natural_f0[wp[:, 1]]
 
-    # F0 is only defined where there's pitch: compare frames voiced in both.
-    voiced = ~np.isnan(synth_f0) & ~np.isnan(natural_f0)
+    # F0 is only defined where there's pitch: compare aligned pairs voiced in both.
+    voiced = ~np.isnan(synth_aligned) & ~np.isnan(natural_aligned)
     if not np.any(voiced):
         return np.nan
 
-    # warping to mel scale (more perceptual than simple log scaling, better handling of 0s)
-    synth_mel = librosa.hz_to_mel(synth_f0[voiced], htk=True)
-    natural_mel = librosa.hz_to_mel(natural_f0[voiced], htk=True)
+    # cents = 1200 * log2(f_synth / f_natural): a log scale, so an octave error costs the
+    # same regardless of register (mel is ~linear below 1 kHz, so it would not do this).
+    cents = 1200.0 * (np.log2(synth_aligned[voiced]) - np.log2(natural_aligned[voiced]))
+    return float(np.sqrt(np.mean(cents ** 2)))
 
-    return float(np.sqrt(np.mean((natural_mel - synth_mel) ** 2)))
+
+def _align_f0(synth_f0, natural_f0):
+    """
+    DTW warping path between two F0 contours.
+
+    Unvoiced gaps are linearly interpolated (in log-Hz) for the alignment cost ONLY, so the
+    path follows pitch shape and isn't broken by NaNs; the returned indices still point into
+    the original NaN-bearing arrays, so voicing is judged on the real frames downstream.
+
+    OUT: arr: (L, 2) warping path of (synth_idx, natural_idx) frame-index pairs
+    """
+    import numpy as np
+    import librosa
+
+    def _logf0_filled(f0):
+        log = np.log2(f0)
+        idx = np.arange(len(log))
+        voiced = ~np.isnan(log)
+        if not np.any(voiced):
+            return np.zeros_like(log)
+        # interp() clamps the ends to the nearest voiced value.
+        return np.interp(idx, idx[voiced], log[voiced])
+
+    X = _logf0_filled(synth_f0)[None, :]
+    Y = _logf0_filled(natural_f0)[None, :]
+    _, wp = librosa.sequence.dtw(X=X, Y=Y, metric="euclidean")
+    return wp
 
 
 def extract_f0(audio_file, sr=16000, fmin=65.0, fmax=400.0,
@@ -73,46 +102,35 @@ def extract_f0(audio_file, sr=16000, fmin=65.0, fmax=400.0,
 
 # -----------------------------------------------------------------------------------------------------------------------
 # 3. MCD
-def mcd(synthesised_audio_file, ground_truth_audio_file,
-        sr=16000, n_mfcc=25, hop_length=256):
+_MCD_TOOLBOX = {}   # cache one pymcd toolbox per mode (the WORLD analyser is reusable)
+
+def mcd(synthesised_audio_file, ground_truth_audio_file, mode="dtw", **kwargs):
     """
-    mel cepstral distortion (MCD) between synthesised and natural speech.
+    mel cepstral distortion (MCD) in dB between synthesised and natural speech.
     measures spectral-envelope distance; lower is closer to the reference.
 
-    mel-cepstral coefficients are approximated by MFCCs (c0/energy dropped so the
-    metric reflects spectral shape, not loudness), then the two sequences are
-    DTW-aligned to handle differing durations before the frame-wise distortion is averaged. 
-    Uses the Kubichek formulation: (10/ln10) * sqrt(2 * sum_d (c_d - c_d')^2).
+    Uses pymcd: a WORLD-vocoder spectral envelope is converted to mel-cepstral
+    coefficients (the coefficients the MCD (10/ln10)*sqrt(2*sum_d (c_d-c_d')^2) dB scale is
+    actually defined for) and the sequences are DTW-aligned to handle differing durations.
+
+    NB: an earlier librosa-MFCC approximation here produced dB values ~50-100x too large --
+    dB-domain MFCCs (DCT of a power_to_db mel spectrogram) are not on the mel-cepstral
+    scale, so the Kubichek constant double-counted the dB conversion and over-weighted the
+    inflated coefficients. Any MCD numbers computed before this change are not comparable.
 
     IN: str: path to synthesised audio file,
         str: path to ground truth audio file
-        int: sr, n_mfcc (mel-cepstral order + 1), hop_length
+        str: pymcd mode -- "dtw" (default; align without a length penalty), "dtw_sl"
+             (adds a speech-length penalty), or "plain"
     OUT: float: mean MCD in dB
     """
-    import numpy as np
-    import librosa
+    from pymcd.mcd import Calculate_MCD
 
-    def get_mfccs(audio_file):
-        """
-        Generates MFCCs from an audio file.
-
-        IN: str: path to audio file
-        OUT: arr: array of MFCCs
-        """
-        y, _ = librosa.load(audio_file, sr=sr)
-        m = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc, hop_length=hop_length)
-        return m[1:]  # drop c0 (energy); shape (n_mfcc-1, T)
-
-    synth = get_mfccs(synthesised_audio_file)
-    natural = get_mfccs(ground_truth_audio_file)
-
-    # DTW-align the two cepstral sequences; wp is the warping path of frame-index pairs.
-    _, wp = librosa.sequence.dtw(X=synth, Y=natural, metric="euclidean")
-    diff = synth[:, wp[:, 0]] - natural[:, wp[:, 1]]
-
-    K = (10.0 / np.log(10)) * np.sqrt(2.0)
-    per_frame = K * np.sqrt(np.sum(diff ** 2, axis=0))
-    return float(np.mean(per_frame))
+    if mode not in _MCD_TOOLBOX:
+        _MCD_TOOLBOX[mode] = Calculate_MCD(MCD_mode=mode)
+    # pymcd takes (reference, target); MCD is symmetric so order only affects DTW tie-breaks.
+    return float(_MCD_TOOLBOX[mode].calculate_mcd(ground_truth_audio_file,
+                                                  synthesised_audio_file))
 
 # -----------------------------------------------------------------------------------------------------------------------
 # 4. WER
@@ -280,16 +298,21 @@ def cs_accent(synthesised_files, ground_truth_files,
 # cache the phoneme recogniser so a whole test set doesn't reload it per call
 _PPG_MODEL = None
 _PPG_PROCESSOR = None
+_PPG_KEEP = None                                   # phone-class column indices (blank dropped)
 _PPG_HUB = "facebook/wav2vec2-lv-60-espeak-cv-ft"  # frame-level IPA phoneme posteriors
 
 def extract_ppg(audio_file, sr=16000):
     """
     extract a phonetic posteriorgram: frame-level posterior distribution over phone
     classes from a (speaker-independent) wav2vec2 phoneme-CTC model.
+
+    The CTC blank (and any special tokens) are dropped before re-normalising: a CTC model
+    emits blank on most frames between phone spikes, so leaving it in makes the PPG -- and
+    any divergence over it -- dominated by blank/spike *timing* rather than phonetic content.
     IN: str: path to audio file
     OUT: arr: (T, P) — each row a probability distribution over P phone classes
     """
-    global _PPG_MODEL, _PPG_PROCESSOR
+    global _PPG_MODEL, _PPG_PROCESSOR, _PPG_KEEP
     import numpy as np
     import librosa
     import torch
@@ -300,13 +323,19 @@ def extract_ppg(audio_file, sr=16000):
         # never decode to text, so the tokenizer/phonemizer backend isn't needed.
         _PPG_PROCESSOR = AutoFeatureExtractor.from_pretrained(_PPG_HUB)
         _PPG_MODEL = AutoModelForCTC.from_pretrained(_PPG_HUB).eval()
+        # blank == pad_token_id for wav2vec2-CTC; also drop bos/eos if the config has them.
+        cfg = _PPG_MODEL.config
+        drop = {cfg.pad_token_id, getattr(cfg, "bos_token_id", None),
+                getattr(cfg, "eos_token_id", None)}
+        _PPG_KEEP = np.array([i for i in range(cfg.vocab_size) if i not in drop])
 
     y, _ = librosa.load(audio_file, sr=sr)
     inputs = _PPG_PROCESSOR(y, sampling_rate=sr, return_tensors="pt")
     with torch.no_grad():
-        logits = _PPG_MODEL(**inputs).logits[0]      # (T, P)
+        logits = _PPG_MODEL(**inputs).logits[0]      # (T, V)
     ppg = torch.softmax(logits, dim=-1).cpu().numpy()
-    return ppg
+    ppg = ppg[:, _PPG_KEEP]                           # drop blank/special columns
+    return ppg / ppg.sum(axis=1, keepdims=True)       # re-normalise over phone classes
 
 def _kl_matrix(p, q):
     """pairwise KL(p_i || q_j) -> (len(p), len(q)). p, q are (n, P) row-stochastic."""

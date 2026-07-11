@@ -227,6 +227,7 @@ __marimo__/
 # Raw datasets / corpora (VCTK etc.) — far too large for git
 Datasets/
 vctk/
+arctic.data
 
 # Third-party model repos cloned for experiments (each has its own .git;
 # re-clone from source rather than vendoring them here)
