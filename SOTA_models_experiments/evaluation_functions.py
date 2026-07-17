@@ -177,11 +177,18 @@ def get_hypothesis(wav_file, model_size="base.en"):
 # -----------------------------------------------------------------------------------------------------------------------
 # 5. AccentID acc.
 
-# GenAID runs in its own isolated env (speechbrain 0.5.x / py3.10);
-# (calling as a subprocess so its old deps don't collide with this eval env.)
+# GenAID (accent-ID) needs its own isolated environment (speechbrain 0.5.x / py3.10),
+# so it is called as a subprocess to keep its old dependencies from colliding with the
+# main eval env. Override the interpreter with GENAID_PYTHON (an absolute path to that
+# env's python) and the recipe location with GENAID_DIR when running on another machine.
 import os as _os
-_GENAID_DIR = _os.path.join(_os.path.dirname(__file__), "GenAID", "recipes", "CommonAccent")
-_GENAID_PYTHON = "/Users/diyagoel/miniconda3/envs/genaid/bin/python"
+_GENAID_DIR = _os.environ.get(
+    "GENAID_DIR",
+    _os.path.join(_os.path.dirname(__file__), "GenAID", "recipes", "CommonAccent"),
+)
+_GENAID_PYTHON = _os.environ.get(
+    "GENAID_PYTHON", _os.path.expanduser("~/miniconda3/envs/genaid/bin/python")
+)
 
 # Match accents between GenAID and VCTK
 GENAID_TO_VCTK = {

@@ -153,7 +153,7 @@ def read_audio_text_pairs(csv_path, audio_root):
     return pairs
 
 
-def prepare_dataset(metadata_csv, audio_root, out_dir, is_finetune=True):
+def prepare_dataset(metadata_csv, audio_root, out_dir, is_finetune=True, lora_label=None):
     pairs = read_audio_text_pairs(metadata_csv, audio_root)
     if not pairs:
         raise RuntimeError(f"No usable rows in {metadata_csv}")
@@ -178,7 +178,12 @@ def prepare_dataset(metadata_csv, audio_root, out_dir, is_finetune=True):
             continue
         if duration <= 0:
             continue
-        result.append({"audio_path": audio_path, "text": conv_text, "duration": duration})
+        row = {"audio_path": audio_path, "text": conv_text, "duration": duration}
+        if lora_label is not None:
+            # per-sample LoRA label; a single-accent run uses one constant label.
+            # The LoRA dataset/sampler (dataset.py) reads row["lora_label"].
+            row["lora_label"] = int(lora_label)
+        result.append(row)
         durations.append(duration)
         vocab_set.update(list(conv_text))
 
@@ -224,6 +229,9 @@ def _build_parser():
     p_p.add_argument("--out-dir", required=True)
     p_p.add_argument("--no-finetune-vocab", action="store_true",
                      help="build a fresh vocab instead of copying the pretrained one")
+    p_p.add_argument("--lora-label", type=int, default=None,
+                     help="write a constant per-sample lora_label (required for LoRA "
+                          "training; a single-accent run uses one label, e.g. 0)")
     return parser
 
 
@@ -235,6 +243,7 @@ def main():
         prepare_dataset(
             args.metadata, args.audio_root, args.out_dir,
             is_finetune=not args.no_finetune_vocab,
+            lora_label=args.lora_label,
         )
 
 

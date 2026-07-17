@@ -7,8 +7,8 @@ their pairwise cosine similarity. If the accent word is ignored, the four embedd
 near-identical (cross-accent similarity ~1.0); a model that actually renders the accent would
 push them apart (lower similarity).
 
-Run with the .conda interpreter (shells out to the genaid env):
-    /path/to/.conda/bin/python parler_accent_invariance.py
+Run with the main evaluation interpreter; it shells out to the GenAID environment for the
+accent embeddings (override with GENAID_PYTHON, as in run_eval.py).
 """
 from itertools import combinations
 from pathlib import Path

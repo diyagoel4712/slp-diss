@@ -27,6 +27,13 @@ accent vector and would pollute magnitude/direction).
         --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt \
         --ckpt-dir ckpts/british --include ema_model_state_dict \
         --out-csv results/british/temporal.csv
+
+For a LoRA fine-tune the accent vector IS the LoRA weights, so pass ``--lora`` and
+point ``--ckpt-dir`` at the snapshots dir (no ``--pretrained`` needed):
+
+    python -m accent_vector.experiments.rq_temporal --lora \
+        --ckpt-dir exps/F5TTS_v1_LoRA_british/<run>/ckpts/snapshots \
+        --out-csv results/british/temporal.csv
 """
 
 import argparse
@@ -52,14 +59,40 @@ def _step(name):
     return int(m.group(1)) if m else None
 
 
-def collect_checkpoints(ckpt_dir):
-    """Sorted [(step, path)] for model_<step>.pt, skipping derived files."""
+def collect_checkpoints(ckpt_dir, prefix=None):
+    """Sorted [(step, path)] for <prefix><step>.pt (default any model_<step>.pt),
+    skipping derived files."""
     out = []
     for p in Path(ckpt_dir).glob("*.pt"):
+        if prefix is not None and not p.name.startswith(prefix):
+            continue
         s = _step(p.name)
         if s is not None and not any(x in p.name for x in ("interpolated", "diff", "accent_a")):
             out.append((s, str(p)))
     return sorted(out)
+
+
+def _lora_flat(ckpt_path):
+    """Flat dict of a LoRA snapshot's float tensors. The accent vector IS the LoRA
+    weights (tau = theta_LoRA, paper Eq. 3); zero-init decoders make the pretrained
+    baseline implicitly the zero vector, so no theta_pre diff is needed."""
+    import torch
+
+    obj = torch.load(ckpt_path, map_location="cpu", weights_only=True)
+    sd = obj.get("lora_state_dict", obj) if isinstance(obj, dict) else obj
+    return {k: v for k, v in sd.items()
+            if hasattr(v, "is_floating_point") and v.is_floating_point()}
+
+
+def _vector_1d_lora(ckpt_path, include, exclude):
+    """tau_t straight from the LoRA snapshot weights (no theta_pre diff)."""
+    flat = _lora_flat(ckpt_path)
+    keys = sorted(k for k in flat if _key_selected(k, include, exclude))
+    if not keys:
+        raise SystemExit(f"no selected float LoRA tensors in {ckpt_path} "
+                         f"(include={include}, exclude={exclude})")
+    vec = np.concatenate([flat[k].detach().cpu().float().numpy().ravel() for k in keys])
+    return keys, vec
 
 
 def _vector_1d(pretrained_flat, ckpt_path, include, exclude):
@@ -76,21 +109,29 @@ def _vector_1d(pretrained_flat, ckpt_path, include, exclude):
 
 
 def run(pretrained, ckpt_dir, out_csv, threshold=0.95, include=None, exclude=None,
-        final_ckpt=None):
+        final_ckpt=None, lora=False):
     exclude = exclude if exclude is not None else DEFAULT_EXCLUDE
-    pre = load_flat_checkpoint(pretrained)
-    ckpts = collect_checkpoints(ckpt_dir)
-    if not ckpts:
-        raise SystemExit(f"no model_<step>.pt checkpoints found in {ckpt_dir}")
+    if lora:
+        pre = None
+        ckpts = collect_checkpoints(ckpt_dir, prefix="lora_")
+        if not ckpts:
+            raise SystemExit(f"no lora_<step>.pt snapshots found in {ckpt_dir}")
+        vec_of = lambda path: _vector_1d_lora(path, include, exclude)
+    else:
+        pre = load_flat_checkpoint(pretrained)
+        ckpts = collect_checkpoints(ckpt_dir)
+        if not ckpts:
+            raise SystemExit(f"no model_<step>.pt checkpoints found in {ckpt_dir}")
+        vec_of = lambda path: _vector_1d(pre, path, include, exclude)
 
     final_path = final_ckpt or ckpts[-1][1]
-    keys_final, v_final = _vector_1d(pre, final_path, include, exclude)
+    keys_final, v_final = vec_of(final_path)
     n_final = float(np.linalg.norm(v_final))
     print(f"[temporal] final = {final_path}  ||tau_final||={n_final:.4f}  dim={v_final.size}")
 
     rows = []
     for step, path in ckpts:
-        keys, v = _vector_1d(pre, path, include, exclude)
+        keys, v = vec_of(path)
         if keys != keys_final:
             raise SystemExit(f"parameter-key mismatch at {path}; checkpoints must "
                              f"share architecture with the final checkpoint")
@@ -121,8 +162,12 @@ def run(pretrained, ckpt_dir, out_csv, threshold=0.95, include=None, exclude=Non
 
 def main():
     p = argparse.ArgumentParser(description="RQ6/Tier1 accent-vector fine-tuning trajectory")
-    p.add_argument("--pretrained", required=True, help="base checkpoint theta_pre")
-    p.add_argument("--ckpt-dir", required=True, help="dir of model_<step>.pt fine-tuning checkpoints")
+    p.add_argument("--lora", action="store_true",
+                   help="LoRA mode: build tau_t from lora_<step>.pt snapshots directly "
+                        "(tau = theta_LoRA, zero baseline); --pretrained not needed")
+    p.add_argument("--pretrained", help="base checkpoint theta_pre (full-FT mode only)")
+    p.add_argument("--ckpt-dir", required=True,
+                   help="dir of model_<step>.pt checkpoints, or lora_<step>.pt snapshots with --lora")
     p.add_argument("--final-ckpt", help="reference tau_final (default: highest-step checkpoint)")
     p.add_argument("--threshold", type=float, default=0.95, help="convergence threshold")
     p.add_argument("--include", action="append", default=[],
@@ -131,8 +176,10 @@ def main():
                    help="drop these key substrings (default: optimizer)")
     p.add_argument("--out-csv", required=True)
     a = p.parse_args()
+    if not a.lora and not a.pretrained:
+        p.error("--pretrained is required unless --lora is set")
     run(a.pretrained, a.ckpt_dir, a.out_csv, threshold=a.threshold,
-        include=a.include or None, exclude=a.exclude, final_ckpt=a.final_ckpt)
+        include=a.include or None, exclude=a.exclude, final_ckpt=a.final_ckpt, lora=a.lora)
 
 
 if __name__ == "__main__":

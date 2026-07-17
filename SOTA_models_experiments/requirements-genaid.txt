@@ -1,0 +1,28 @@
+# Accent-ID / embedding environment ("genaid", Python 3.10)
+# Used (via subprocess) by evaluation_functions.py for:
+#   #5 AccentID accuracy (GenAID + CommonAccent), #6 CS accent embeddings,
+#   #8 speaker similarity (ECAPA-TDNN).
+#
+# This env is deliberately separate from .conda because SpeechBrain 0.5.x pins old
+# deps that conflict with the eval env. SpeechBrain is installed *editable* from the
+# (gitignored) GenAID fork clone, so it is NOT listed here -- see README.md for the
+# full build recipe, the Google-Drive checkpoint, and the three required fork patches.
+#
+# Build recipe (summary; see README.md "GenAID env setup" for details):
+#   conda create -n genaid python=3.10 -y
+#   conda run -n genaid pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+#   conda run -n genaid pip install -r requirements-genaid.txt
+#   conda run -n genaid pip install --editable SOTA_models_experiments/GenAID
+#
+# Versions pinned to what was verified working on 2026-06-15 (macOS, CPU).
+
+torch==2.12.0             # CPU build (install from the pytorch cpu index, see above)
+torchaudio==2.11.0
+transformers==5.12.0      # backs SpeechBrain's HuggingFaceWav2Vec2 (XLSR backbone)
+huggingface_hub==1.16.1
+HyperPyYAML==1.2.3
+librosa==0.11.0           # audio loading in the wrappers (avoids torchaudio/torchcodec)
+soundfile==0.14.0
+sentencepiece==0.2.1
+numpy==2.2.6
+# NB: speechbrain==0.5.15 is installed editable from SOTA_models_experiments/GenAID
