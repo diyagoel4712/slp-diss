@@ -2,8 +2,8 @@
 rhythm math, gap-closure, and the eval-suite bridge.
 
 The pure-math helpers (cosine_matrix, mantel_test, classical_mds, npvi,
-gap_closure_*) have no heavy dependencies beyond numpy and are unit-tested in
-tests_math.py.
+gap_closure_*) have no heavy dependencies beyond numpy, so they can be exercised
+in isolation without loading any TTS/eval model.
 """
 
 import re
@@ -13,14 +13,14 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[3]
-SOTA = REPO / "SOTA_models_experiments"
+EVAL_DIR = REPO / "Evaluation"          # reusable metric suite (evaluation_functions.py)
 
 
 # --- eval-suite bridge ------------------------------------------------------
 def load_eval():
     """Import the repo's evaluation_functions (kept unchanged; the plan reuses it)."""
-    if str(SOTA) not in sys.path:
-        sys.path.insert(0, str(SOTA))
+    if str(EVAL_DIR) not in sys.path:
+        sys.path.insert(0, str(EVAL_DIR))
     import evaluation_functions as ef  # noqa: E402
     return ef
 
@@ -53,6 +53,11 @@ def load_vector_flat(vector_path, include=None, exclude=None):
     """Flatten a saved accent vector into one 1-D numpy array over its float
     tensors, in sorted-key order (stable across accents so vectors are
     comparable). Optional include/exclude substrings restrict to a layer subset.
+
+    Accepts either track's vector: a full-weight diff from ``extract_vector`` or a
+    LoRA snapshot (``lora_<step>.pt`` / a saved ``lora_state_dict``) -- both
+    flatten through ``load_flat_checkpoint``, and a LoRA snapshot's keys keep the
+    ``blocks.N.attn...`` paths so ``rq3_layers`` groups them the same way.
 
     NB: full fine-tune vectors are ~300M-D; prefer LoRA vectors here, or pass a
     layer filter, to keep this in memory.
@@ -206,23 +211,3 @@ def leakage_onset(alphas, signal, threshold, rising=True):
     return float("nan")
 
 
-# --- speaker metadata (RQ5.1 gender split) ----------------------------------
-def vctk_gender_map(vctk_root):
-    """speaker_id -> 'M'/'F' from VCTK speaker-info.txt."""
-    info = Path(vctk_root) / "speaker-info.txt"
-    out = {}
-    if not info.exists():
-        return out
-    for i, line in enumerate(info.read_text(encoding="utf-8").splitlines()):
-        if i == 0:
-            continue
-        p = line.split()
-        if len(p) >= 3:
-            out[p[0]] = p[2]
-    return out
-
-
-def speaker_from_wav(path):
-    """Best-effort speaker id from a filename like p225_003 or ABA_arctic_a0001."""
-    stem = Path(path).stem
-    return stem.split("_")[0]

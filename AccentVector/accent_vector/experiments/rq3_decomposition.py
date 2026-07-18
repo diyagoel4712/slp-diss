@@ -21,9 +21,72 @@ from pathlib import Path
 
 import numpy as np
 
-from accent_vector.experiments import common
+from accent_vector.experiments import shared
 
 SUPRA_FEATURES = ["pct_voiced", "npvi_voiced", "artic_rate", "f0_mean", "f0_std", "f0_range"]
+
+
+def _run_lengths(mask):
+    """Lengths of consecutive-True runs in a boolean array (e.g. voiced runs)."""
+    mask = np.asarray(mask, dtype=bool)
+    if mask.size == 0:
+        return []
+    idx = np.flatnonzero(np.diff(mask.astype(int)))
+    bounds = np.concatenate(([0], idx + 1, [mask.size]))
+    return [int(bounds[i + 1] - bounds[i]) for i in range(len(bounds) - 1)
+            if mask[bounds[i]]]
+
+
+def _npvi(durations):
+    """normalized Pairwise Variability Index over successive interval durations
+    (a standard speech-rhythm descriptor). Higher = more stress-timed."""
+    d = np.asarray(durations, dtype=float)
+    if d.size < 2:
+        return float("nan")
+    num = np.abs(d[:-1] - d[1:])
+    den = (d[:-1] + d[1:]) / 2.0
+    ok = den > 0
+    return float(100.0 / (d.size - 1) * np.sum(num[ok] / den[ok]))
+
+
+def voicing_rhythm(f0, hop_s):
+    """Alignment-free suprasegmental descriptors from an F0 track (extract_f0):
+    voiced fraction (%V proxy), nPVI over voiced-run durations, and articulation
+    rate (voiced runs per second). A voicing-based proxy for %V/nPVI that needs
+    no forced aligner; swap in MFA vowel/consonant intervals for the rigorous
+    version."""
+    f0 = np.asarray(f0, dtype=float)
+    voiced = ~np.isnan(f0)
+    total = voiced.size
+    runs = _run_lengths(voiced)
+    dur_s = [r * hop_s for r in runs]
+    duration_s = total * hop_s if total else 0.0
+    return {
+        "pct_voiced": float(voiced.mean()) if total else float("nan"),
+        "npvi_voiced": _npvi(dur_s),
+        "artic_rate": (len(runs) / duration_s) if duration_s else float("nan"),
+        "f0_mean": float(np.nanmean(f0)) if voiced.any() else float("nan"),
+        "f0_std": float(np.nanstd(f0)) if voiced.any() else float("nan"),
+        "f0_range": (float(np.nanmax(f0) - np.nanmin(f0)) if voiced.any() else float("nan")),
+    }
+
+
+def gap_closure_scalar(base, alpha_val, natural):
+    """Fraction of the baseline->natural gap a scalar feature closes at this
+    alpha: (x_alpha - x_base) / (x_natural - x_base). ~1 => moved fully to the
+    natural-accent value; ~0 => did not move."""
+    denom = natural - base
+    if abs(denom) < 1e-12:
+        return float("nan")
+    return float((alpha_val - base) / denom)
+
+
+def gap_closure_distance(d_base_to_natural, d_alpha_to_natural):
+    """Fraction of a distance-to-natural closed (e.g. PPG-KL): 1 - d_alpha/d_base."""
+    if abs(d_base_to_natural) < 1e-12:
+        return float("nan")
+    return float(1.0 - d_alpha_to_natural / d_base_to_natural)
+
 
 
 def _mean_ppg_kl(synth_wavs, natural_wavs, ef):
@@ -36,36 +99,36 @@ def _mean_ppg_kl(synth_wavs, natural_wavs, ef):
 def _mean_supra(wavs, ef, hop_s):
     feats = {k: [] for k in SUPRA_FEATURES}
     for w in wavs:
-        vr = common.voicing_rhythm(ef.extract_f0(w), hop_s)
+        vr = voicing_rhythm(ef.extract_f0(w), hop_s)
         for k in SUPRA_FEATURES:
             feats[k].append(vr[k])
     return {k: float(np.nanmean(v)) for k, v in feats.items()}
 
 
 def run(sweep_dir, natural_ref, out_csv, hop_s):
-    ef = common.load_eval()
-    natural = common.wavs_in(natural_ref)
+    ef = shared.load_eval()
+    natural = shared.wavs_in(natural_ref)
     if not natural:
         raise SystemExit(f"no natural target-accent clips in {natural_ref}")
     natural_supra = _mean_supra(natural, ef, hop_s)
 
-    grid = common.alpha_dirs(sweep_dir)
+    grid = shared.alpha_dirs(sweep_dir)
     base_alpha, base_dir = grid[0]  # alpha=0 baseline (GAE anchor)
-    base_wavs = common.wavs_in(base_dir)
+    base_wavs = shared.wavs_in(base_dir)
     base_seg = _mean_ppg_kl(base_wavs, natural, ef)
     base_supra = _mean_supra(base_wavs, ef, hop_s)
 
     rows = []
     for alpha, d in grid:
-        wavs = common.wavs_in(d)
+        wavs = shared.wavs_in(d)
         seg = _mean_ppg_kl(wavs, natural, ef)
         supra = _mean_supra(wavs, ef, hop_s)
         row = {"alpha": alpha, "seg_ppg_kl_to_natural": seg,
-               "seg_closure": common.gap_closure_distance(base_seg, seg)}
+               "seg_closure": gap_closure_distance(base_seg, seg)}
         closures = []
         for k in SUPRA_FEATURES:
             row[k] = supra[k]
-            c = common.gap_closure_scalar(base_supra[k], supra[k], natural_supra[k])
+            c = gap_closure_scalar(base_supra[k], supra[k], natural_supra[k])
             row[f"{k}_closure"] = c
             if not np.isnan(c):
                 closures.append(c)

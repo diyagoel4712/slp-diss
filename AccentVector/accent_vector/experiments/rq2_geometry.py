@@ -20,7 +20,53 @@ from pathlib import Path
 
 import numpy as np
 
-from accent_vector.experiments import common
+from accent_vector.experiments import shared
+
+
+def load_vector_flat(vector_path, include=None, exclude=None):
+    """Flatten a saved accent vector into one 1-D numpy array over its float
+    tensors, in sorted-key order (stable across accents so vectors are
+    comparable). Optional include/exclude substrings restrict to a layer subset.
+
+    Accepts either track's vector: a full-weight diff from ``extract_vector`` or a
+    LoRA snapshot (``lora_<step>.pt`` / a saved ``lora_state_dict``) -- both
+    flatten through ``load_flat_checkpoint``, and a LoRA snapshot's keys keep the
+    ``blocks.N.attn...`` paths so ``rq3_layers`` groups them the same way.
+
+    NB: full fine-tune vectors are ~300M-D; prefer LoRA vectors here, or pass a
+    layer filter, to keep this in memory.
+    """
+    from accent_vector.extract_vector import load_flat_checkpoint, _key_selected
+
+    flat = load_flat_checkpoint(vector_path)
+    parts = []
+    for key in sorted(flat):
+        t = flat[key]
+        if hasattr(t, "is_floating_point") and t.is_floating_point():
+            if _key_selected(key, include, exclude):
+                parts.append(t.detach().cpu().float().numpy().ravel())
+    if not parts:
+        raise ValueError(f"no float tensors selected in {vector_path}")
+    return np.concatenate(parts)
+
+
+def mantel_test(A, B, n_perm=9999, seed=0):
+    """Correlate two symmetric matrices over their upper triangle, with a row/col
+    permutation test. Returns (pearson_r, p_value). Used for RSA between the
+    weight-space and output-space accent-similarity matrices (RQ2)."""
+    A, B = np.asarray(A, float), np.asarray(B, float)
+    iu = np.triu_indices_from(A, k=1)
+    a = A[iu]
+    r_obs = float(np.corrcoef(a, B[iu])[0, 1])
+    rng = np.random.default_rng(seed)
+    n = A.shape[0]
+    hits = 0
+    for _ in range(n_perm):
+        p = rng.permutation(n)
+        if abs(np.corrcoef(a, B[np.ix_(p, p)][iu])[0, 1]) >= abs(r_obs):
+            hits += 1
+    return r_obs, (hits + 1) / (n_perm + 1)
+
 
 
 def _parse_pairs(items):
@@ -32,22 +78,22 @@ def _parse_pairs(items):
 
 
 def weight_space_matrix(vectors, include=None, exclude=None):
-    loaded = {n: common.load_vector_flat(p, include=include, exclude=exclude)
+    loaded = {n: load_vector_flat(p, include=include, exclude=exclude)
               for n, p in vectors.items()}
-    return common.cosine_matrix(loaded)
+    return shared.cosine_matrix(loaded)
 
 
 def output_space_matrix(synth_dirs):
     """Mean GenAID accent embedding per accent -> cosine matrix."""
-    ef = common.load_eval()
+    ef = shared.load_eval()
     names = list(synth_dirs)
     centroids = {}
     for name in names:
-        wavs = common.wavs_in(synth_dirs[name])
+        wavs = shared.wavs_in(synth_dirs[name])
         preds = ef.predict_accent_genaid(wavs, with_embeddings=True)
         embs = np.asarray([p["embedding"] for p in preds], dtype=float)
         centroids[name] = embs.mean(axis=0)
-    return common.cosine_matrix(centroids)
+    return shared.cosine_matrix(centroids)
 
 
 def _write_matrix(path, names, M):
@@ -64,7 +110,7 @@ def run(vectors, synth_dirs, out_dir, include, exclude):
 
     names_w, W = weight_space_matrix(vectors, include=include, exclude=exclude)
     _write_matrix(out_dir / "weight_space_cosine.csv", names_w, W)
-    coords = common.classical_mds(W, 2)
+    coords = shared.classical_mds(W, 2)
     with open(out_dir / "weight_space_mds.csv", "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["accent", "mds1", "mds2"])
@@ -80,7 +126,7 @@ def run(vectors, synth_dirs, out_dir, include, exclude):
         idx = [names_w.index(n) for n in names_o]
         Wr = W[np.ix_(idx, idx)]
         if len(names_o) >= 3:
-            r, p = common.mantel_test(Wr, O)
+            r, p = mantel_test(Wr, O)
             (out_dir / "rsa_mantel.txt").write_text(
                 f"accents: {names_o}\nMantel r={r:.4f} p={p:.4f}\n")
             print(f"[rq2] RSA Mantel r={r:.4f} p={p:.4f} over {names_o}")

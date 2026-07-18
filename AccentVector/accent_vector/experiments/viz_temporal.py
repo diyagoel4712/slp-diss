@@ -25,8 +25,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
-from accent_vector.experiments import common
-from accent_vector.experiments.rq_temporal import collect_checkpoints, _vector_1d_lora
+from accent_vector.experiments import shared
+from AccentVector.accent_vector.experiments.rq6_temporal import collect_checkpoints, _vector_1d_lora
 
 
 def _load_trajectory(ckpt_dir, include, exclude):
@@ -49,8 +49,8 @@ def _load_trajectory(ckpt_dir, include, exclude):
 def _geometry(traj):
     """MDS embedding of {tau_t}, magnitudes, and cos_to_final."""
     vecs = {str(step): v for step, v in traj}
-    names, C = common.cosine_matrix(vecs)          # names preserve step order
-    emb = common.classical_mds(C, 2)               # (N, 2)
+    names, C = shared.cosine_matrix(vecs)          # names preserve step order
+    emb = shared.classical_mds(C, 2)               # (N, 2)
     final = traj[-1][1]
     nfinal = float(np.linalg.norm(final)) or 1.0
     mags = np.array([float(np.linalg.norm(v)) for _, v in traj])

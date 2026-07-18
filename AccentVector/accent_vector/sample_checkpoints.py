@@ -8,7 +8,8 @@ fixed. It runs post-hoc in the f5-tts inference env, decoupled from training.
 
 The accent vector is the LoRA branch, so alpha-scaling is native: pass --lora-alpha
 to fold tau at any strength (alpha=1 is the trained model; the RQ1 sweep is just
-several --lora-alpha values). No merged checkpoints needed.
+several --lora-alpha values). No merged checkpoints needed. Shares its base+LoRA
+build with infer_accent via accent_vector.lora_model.
 
     python -m accent_vector.sample_checkpoints \
         --run-dir exps/F5TTS_v1_LoRA_british/<run> \
@@ -19,21 +20,18 @@ several --lora-alpha values). No merged checkpoints needed.
 """
 
 import argparse
-import json
 import re
 from pathlib import Path
 
 import torch
 import soundfile as sf
-from omegaconf import OmegaConf
-from hydra.utils import get_class
+from f5_tts.infer.utils_infer import infer_process, preprocess_ref_audio_text
 
-from f5_tts.model import CFM
-from f5_tts.model.utils import get_tokenizer
-from f5_tts.infer.utils_infer import (
-    load_vocoder,
-    infer_process,
-    preprocess_ref_audio_text,
+from accent_vector.lora_model import (
+    build_base_model,
+    load_lora_state,
+    overlay_lora,
+    resolve_lora_idx,
 )
 
 
@@ -47,21 +45,6 @@ def _snapshots(snap_dir):
     return sorted(out)
 
 
-def _base_state_dict(base_ckpt, device):
-    """The base (non-LoRA) weights, keyed like the CFM's own state_dict."""
-    ckpt = torch.load(base_ckpt, map_location=device, weights_only=True)
-    if "model_state_dict" in ckpt:
-        sd = ckpt["model_state_dict"]
-    elif "ema_model_state_dict" in ckpt:
-        sd = {k.replace("ema_model.", ""): v for k, v in ckpt["ema_model_state_dict"].items()
-              if k not in ("initted", "step", "update")}
-    else:
-        sd = ckpt
-    for key in ("mel_spec.mel_stft.mel_scale.fb", "mel_spec.mel_stft.spectrogram.window"):
-        sd.pop(key, None)
-    return sd
-
-
 def run(run_dir, base_ckpt, ref_audio, ref_text, gen_text, out_dir,
         config_path=None, vocab_path=None, snap_dir=None, lora_alpha=None,
         lora_label=None, device=None):
@@ -71,57 +54,31 @@ def run(run_dir, base_ckpt, ref_audio, ref_text, gen_text, out_dir,
     snap_dir = snap_dir or (run_dir / "ckpts" / "snapshots")
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    cfg = OmegaConf.load(str(config_path))
-    arch = OmegaConf.to_container(cfg.model.arch, resolve=True)
-    if lora_alpha is not None:  # native alpha-scaling of the accent vector
-        arch["lora_alpha"] = float(lora_alpha)
-
     # lora_idx for this accent (default 0 = the single LoRA trained here).
-    lora_idx = 0
-    mapping = run_dir / "lora_mapping.json"
-    if lora_label is not None and mapping.exists():
-        lora_idx = json.load(open(mapping))[lora_label]
+    lora_idx = resolve_lora_idx(lora_label, run_dir / "lora_mapping.json")
 
     snaps = _snapshots(snap_dir)
     if not snaps:
         raise SystemExit(f"no lora_<step>.pt snapshots in {snap_dir}")
-    print(f"[scrub] {len(snaps)} snapshots, steps {snaps[0][0]}..{snaps[-1][0]}; "
-          f"lora_alpha={arch.get('lora_alpha', 1.0)} lora_idx={lora_idx} device={device}")
-
-    mel = cfg.model.mel_spec
-    mel_spec_kwargs = dict(n_fft=mel.n_fft, hop_length=mel.hop_length, win_length=mel.win_length,
-                           n_mel_channels=mel.n_mel_channels, target_sample_rate=mel.target_sample_rate,
-                           mel_spec_type=mel.mel_spec_type)
-    vocab_char_map, vocab_size = get_tokenizer(str(vocab_path), "custom")
-    vocoder = load_vocoder(vocoder_name=mel.mel_spec_type, is_local=cfg.model.vocoder.is_local,
-                           local_path=cfg.model.vocoder.local_path)
-
-    model_cls = get_class(f"f5_tts.model.{cfg.model.backbone}")
-    model = CFM(
-        transformer=model_cls(**arch, text_num_embeds=vocab_size, mel_dim=mel.n_mel_channels),
-        mel_spec_kwargs=mel_spec_kwargs,
-        vocab_char_map=vocab_char_map,
-        tokenized=cfg.model.get("tokenized", False),
-        tokenizer=cfg.model.tokenizer,
-    ).to(device)
 
     # Base fills the frozen backbone; LoRA keys stay at init (zero effect) until overlaid.
-    base_sd = _base_state_dict(base_ckpt, device)
-    missing, unexpected = model.load_state_dict(base_sd, strict=False)
-    print(f"[scrub] base loaded (missing={len(missing)} lora keys, unexpected={len(unexpected)})")
+    model, cfg, vocoder = build_base_model(config_path, vocab_path, base_ckpt, device,
+                                           lora_alpha=lora_alpha)
+    mel_spec_type = cfg.model.mel_spec.mel_spec_type
+    print(f"[scrub] {len(snaps)} snapshots, steps {snaps[0][0]}..{snaps[-1][0]}; "
+          f"lora_alpha={lora_alpha if lora_alpha is not None else 'config'} "
+          f"lora_idx={lora_idx} device={device}")
 
     ref_audio_p, ref_text_p = preprocess_ref_audio_text(ref_audio, ref_text)
 
     out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     for step, path in snaps:
-        lora_sd = torch.load(path, map_location=device, weights_only=True)
-        lora_sd = lora_sd.get("lora_state_dict", lora_sd)
-        model.load_state_dict(lora_sd, strict=False)  # overlay this step's accent vector
+        overlay_lora(model, load_lora_state(path, device))  # overlay this step's accent vector
         model.eval()
         with torch.inference_mode():
             audio, sr, _ = infer_process(
                 ref_audio_p, ref_text_p, gen_text, model, vocoder,
-                mel_spec_type=mel.mel_spec_type, device=device, lora_idx=lora_idx,
+                mel_spec_type=mel_spec_type, device=device, lora_idx=lora_idx,
             )
         wav = out_dir / f"step_{step}.wav"
         sf.write(str(wav), audio, sr)

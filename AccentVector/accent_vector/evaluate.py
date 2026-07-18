@@ -1,6 +1,6 @@
 """Score an alpha-sweep tree with the repo's existing eval suite.
 
-Reuses ``SOTA_models_experiments/evaluation_functions.py`` unchanged (the plan's
+Reuses ``Evaluation/evaluation_functions.py`` unchanged (the plan's
 step 4): the paper's Section 5 metrics map onto ours as
 
     WER            -> wer            (Whisper)
@@ -12,8 +12,8 @@ For an ``infer_accent`` sweep laid out as ``<sweep>/alpha_<a>/utt####.wav`` this
 produces one metrics row per alpha, so you can check the core claim directly:
 accent similarity should rise with alpha while speaker similarity stays high.
 
-Because the reference is fixed and neutral across the sweep, speaker similarity
-is measured against that reference clip. Accent metrics are optional and need
+Because the reference is fixed per accent across the sweep (the accent's
+native-language L1 clip), speaker similarity is measured against that reference clip. Accent metrics are optional and need
 real target-accent clips to compare against (``--accent-ref``), mirroring how
 cs_accent stood in for VoxProfile accent-sim in our benchmark.
 
@@ -22,7 +22,7 @@ Usage
     python -m accent_vector.evaluate \
         --sweep-dir results/british \
         --transcripts transcripts/eval_transcripts.txt \
-        --ref-wav refs/neutral.wav \
+        --ref-wav refs/england.wav \
         --accent-ref /data/vctk_england_clips \
         --target-accent English \
         --out-csv results/british/metrics.csv
@@ -35,7 +35,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / "SOTA_models_experiments"))
+sys.path.insert(0, str(REPO / "Evaluation"))
 
 
 def alpha_dirs(sweep_dir):
@@ -78,7 +78,7 @@ def score_dir(d, transcripts, ref_wav, accent_refs, target_accent, device):
                 errs.append(ef.wer(w, transcripts[int(m.group(1))]))
         row["wer"] = sum(errs) / len(errs) if errs else "n/a"
 
-    # --- speaker similarity vs the fixed neutral reference ---
+    # --- speaker similarity vs the fixed native-language (L1) reference ---
     if ref_wav:
         try:
             row["spk_sim"] = ef.speaker_similarity(wavs, [ref_wav] * len(wavs), device=device)
@@ -107,7 +107,7 @@ def main():
     parser = argparse.ArgumentParser(description="Score an alpha-sweep with the repo eval suite")
     parser.add_argument("--sweep-dir", required=True)
     parser.add_argument("--transcripts", help="same file fed to infer_accent")
-    parser.add_argument("--ref-wav", help="fixed neutral reference (for speaker similarity)")
+    parser.add_argument("--ref-wav", help="native-language (L1) reference (for speaker similarity)")
     parser.add_argument("--accent-ref", help="dir of real target-accent clips (for cs_accent)")
     parser.add_argument("--target-accent", help="intended accent label (for aid_acc)")
     parser.add_argument("--device", default="cpu")

@@ -19,6 +19,51 @@ untouched?* This matters because the method claims to shift "duration, rhythm
 and prosody" but never measures whether it does — and its evaluation instruments
 (VoxProfile, Whisper, UTMOS) are themselves phoneme- and English-biased.
 
+
+Goal: replicate the **Accent Vector** method (Lertpetchpun et al., 2026 — task-vector accent
+control via LoRA) by adapting **Expressive-Vectors** (github.com/the-bird-F/Expressive-Vectors,
+Apache-2.0), but on **F5-TTS** as the backbone instead of the paper's XTTS-v2.
+
+Why F5-TTS: it was the best model in our own benchmark (MCD 7.2, accent-sim 0.73, spk-sim
+0.62), we already run it (`Preliminary_test_results/f5-tts`, weights cached), and Expressive-
+Vectors already implements the LoRA-fine-tune → extract-vector → scale/interpolate → infer
+pipeline on F5-TTS. The task-vector method is backbone-agnostic: `θ = θ_pre + Σ αᵢ·τᵢ`, where
+`τᵢ = θ_LoRA(i)` (the i-th accent's LoRA delta).
+
+The paper's L2 recipe on XTTS = "fine-tune on the target *language's* native speech while
+pinning the **language-ID token to English**", so the LoRA delta is an *accent* shift, not a
+*language* switch. **F5-TTS has no language-ID token** — verified: no `lang_id`/`language_id`
+in the package; it conditions only on (reference audio, reference text, generation text), with
+a `char`/`pinyin` tokenizer. Consequences:
+
+1. **No lang-ID knob to pin** → the anchor that keeps content "English" on XTTS doesn't exist
+   on F5. Instead, content language is set purely by the **generation text** you feed at
+   inference. So the F5 mapping is: LoRA-fine-tune on target-language audio+transcript (delta
+   captures that language's acoustics/prosody); at inference feed **English** text so content
+   stays English while the merged delta pushes acoustics toward the accent. Conceptually this
+   is *cleaner* on F5 (no competing language token), but it is NOT the paper's exact procedure —
+   document the deviation.
+
+2. **Script / vocab coverage is the real gotcha.** F5's base vocab covers Latin (incl.
+   accented) + pinyin. For L2 accents whose native script is non-Latin, native transcripts
+   won't tokenize (unknown chars → id 0):
+   - Vietnamese, Spanish → Latin+diacritics → **OK**.
+   - Hindi (Devanagari), Arabic (Arabic), Korean (Hangul) → **NOT covered** → need romanized/
+     transliterated transcripts, or a vocab extension, before fine-tuning. **Verify the base
+     vocab before assuming.**
+
+3. **Reference audio carries accent — and we keep it (paper-faithful).** F5 clones the
+   reference clip, so its accent feeds the output. Following the paper's cloning setup, we
+   provide a **native-language (L1) reference of the target accent** at inference (e.g. Hindi
+   speech for the Indian accent), held **fixed per accent across the α-sweep** so the vector
+   is the only thing varying within a sweep. The sweep runs between two exact anchors:
+   **α=0 = θ_pre** (the pretrained model, no fine-tuning, cloning the accent from the reference
+   alone) and **α=1 = θ_pre + τ = θ_ft** (the fully fine-tuned model, full accent-vector impact).
+   So it measures the fine-tuning's contribution as accent strength climbs from the base
+   cloning level to the full fine-tune, with speaker identity expected to hold across α.
+
+
+
 ## Research questions & hypotheses
 
 - **RQ1 — Cross-backbone generalisation.** Does task-vector accent control
@@ -65,7 +110,7 @@ F5-TTS with **LoRA** (rank 16, all linear layers — matches the paper, ~30 MB
 vectors, cleaner geometry). Accents: British (VCTK-England control) + Spanish +
 Vietnamese (Latin-script) + one prosodically-distant (Hindi romanised, or
 Mandarin) as the H3 stress test. Measurement reuses
-`SOTA_models_experiments/evaluation_functions.py`:
+`Evaluation/evaluation_functions.py`:
 
 - *Segmental:* `ppg_kl` — KL between synth and natural-accent phone posteriorgrams across α.
 - *Suprasegmental:* `extract_f0` → pitch + voicing-based rhythm proxy (%V, nPVI, articulation rate); MFA alignment as the rigorous upgrade.

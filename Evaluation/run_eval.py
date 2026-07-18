@@ -1,4 +1,4 @@
-"""Headless, re-runnable companion to run_evaluation.ipynb.
+"""Score the L2-ARCTIC accent-TTS grid: headless, re-runnable evaluation entry point.
 
 Builds the (model, accent, speaker, utterance) manifest from eval_config, scores every
 clip that has BOTH a synthesised wav and a reference, and writes evaluation_results.csv.

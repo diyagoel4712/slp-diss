@@ -11,7 +11,7 @@ already save:
                                         alpha supplies the remaining intensity.
   convergence    interpolated step at which cos(tau_t, tau_final) first crosses a
                  threshold (default 0.95) -- one comparable "the direction is set
-                 by step N" number (reuses common.leakage_onset).
+                 by step N" number (reuses shared.leakage_onset).
 
 SCOPE: this is the OPTIMISATION trajectory, NOT data efficiency -- F5 fine-tunes
 many epochs over the same corpus, so step != amount of data. The "how much DATA"
@@ -43,7 +43,7 @@ from pathlib import Path
 
 import numpy as np
 
-from accent_vector.experiments import common
+from accent_vector.experiments import shared
 from accent_vector.extract_vector import (
     _key_selected,
     compute_task_vector,
@@ -144,8 +144,8 @@ def run(pretrained, ckpt_dir, out_csv, threshold=0.95, include=None, exclude=Non
               f"({mag / n_final:.2f} of final)  cos_to_final={cos:.4f}")
 
     steps = [r["step"] for r in rows]
-    dir_step = common.leakage_onset(steps, [r["cos_to_final"] for r in rows], threshold, rising=True)
-    mag_step = common.leakage_onset(steps, [r["mag_frac_final"] for r in rows], threshold, rising=True)
+    dir_step = shared.leakage_onset(steps, [r["cos_to_final"] for r in rows], threshold, rising=True)
+    mag_step = shared.leakage_onset(steps, [r["mag_frac_final"] for r in rows], threshold, rising=True)
     print(f"[temporal] direction reaches cos>={threshold} at step ~{dir_step}; "
           f"magnitude reaches {threshold} of final at step ~{mag_step}  "
           f"(direction settling before magnitude => alpha can substitute for training)")

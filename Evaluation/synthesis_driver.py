@@ -1,12 +1,12 @@
 """Drive each TTS model over the L2-ARCTIC evaluation grid.
 
 Writes one wav per (accent, speaker, utterance) cell to the exact layout that
-`run_evaluation.ipynb` scores:
+`run_eval.py` scores:
 
     SOTA_models_experiments/<model>/outputs/<model>/<accent>/<speaker>/<utt_id>.wav
 
-The grid + per-speaker reference logic live in `eval_config.py` (shared with the eval
-notebook). Run this ONCE PER MODEL, each inside that model's own environment, because the
+The grid + per-speaker reference logic live in `eval_config.py` (shared with `run_eval.py`).
+Run this ONCE PER MODEL, each inside that model's own environment, because the
 models have conflicting dependencies (same reason the metrics are split across envs):
 
     # in the coqui/XTTS env:

@@ -1,6 +1,6 @@
 """Single source of truth for the L2-ARCTIC accent-TTS evaluation grid.
 
-Imported by both `synthesis_driver.py` (generation) and `run_evaluation.ipynb`
+Imported by both `synthesis_driver.py` (generation) and `run_eval.py`
 (scoring) so the synthesised file layout always matches what the metrics look for.
 Change the grid here, not in two places.
 """

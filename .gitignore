@@ -230,11 +230,10 @@ vctk/
 arctic.data
 
 # Third-party model repos cloned for experiments (each has its own .git;
-# re-clone from source rather than vendoring them here)
-SOTA_models_experiments/CosyVoice3/
-SOTA_models_experiments/coqui/
-SOTA_models_experiments/vits/
-SOTA_models_experiments/GenAID/
+# re-clone from source rather than vendoring them here). The preliminary synth
+# clones (CosyVoice3/coqui/vits) now live under Preliminary_test_results/, which
+# is gitignored wholesale below.
+Evaluation/GenAID/
 CLARITY/
 F5-TTS/
 Expressive-Vectors/
@@ -252,3 +251,12 @@ Expressive-Vectors/
 outputs/
 *.wav
 *.flac
+
+# Generated evaluation artifacts (reproducible via Evaluation/run_pipeline.sh)
+Evaluation/evaluation_results.csv
+Evaluation/summary_by_model.csv
+Evaluation/summary_by_accent.csv
+Evaluation/figures/
+
+# Preliminary/exploratory experiment archive (synth trees, prelim notebooks, findings.md)
+Preliminary_test_results/

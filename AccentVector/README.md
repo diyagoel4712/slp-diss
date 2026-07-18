@@ -22,7 +22,7 @@ phase sequencing.
 ## How this differs from the paper
 
 The paper uses XTTS-v2; we use F5-TTS (best model in our own benchmark, already
-set up in `SOTA_models_experiments/f5-tts`). Two consequences, both verified
+set up in `Preliminary_test_results/f5-tts`). Two consequences, both verified
 against the installed F5-TTS:
 
 1. **No language-ID token.** XTTS pins a `[lang]` token to English so the LoRA
@@ -33,18 +33,39 @@ against the installed F5-TTS:
    content stays English while the merged delta pushes the accent. Cleaner on F5
    (no competing token), but *not* the paper's exact procedure.
 
-2. **Full fine-tune, not LoRA (by default).** The task-vector identity
-   `tau = theta_ft - theta_pre` holds for both; the paper's LoRA is an
-   efficiency/regularization choice (Eq. 3: `tau = theta_LoRA`). We default to
-   the full fine-tune that Expressive-Vectors exercises end-to-end. To match the
-   paper's LoRA (rank 16, all linear layers, lr 3e-5), switch `finetune.sh` to
-   the `F5TTS_v1_LoRA` config — but first confirm the checkpoint stores **merged**
-   weights, otherwise the delta lives in new adapter keys absent from the base
-   model and `extract` will (correctly) report an empty vector.
+2. **Two fine-tune tracks — LoRA is the paper-matching one.** The task-vector
+   identity `tau = theta_ft - theta_pre` holds either way; the paper uses LoRA
+   (Eq. 3: `tau = theta_LoRA`, rank 16, all linear layers, lr 3e-5) and the
+   dissertation (PROPOSAL.md) follows it — smaller ~30 MB vectors, cleaner
+   geometry. Two paths exist in `scripts/`:
+   - **LoRA** (`finetune_lora.sh`, `F5TTS_v1_LoRA_accent` config): the accent
+     vector *is* the LoRA branch, scaled natively by `lora_alpha` (no merge).
+     The whole analysis pipeline runs on it — `infer_accent --lora` (and
+     `grid --lora`) build the base+LoRA model **once** and rescale the branch per
+     alpha in place (`accent_vector/lora_model.py`), feeding RQ1–RQ3, plus the RQ6
+     trajectory tooling (`sample_checkpoints.py`, `rq_temporal --lora`,
+     `viz_temporal`). This is the paper-matching, default track.
+   - **Full fine-tune** (`finetune.sh`, `F5TTS_v1_Base`): the path
+     Expressive-Vectors exercises end-to-end; `extract_vector` diffs the full
+     checkpoint and `compose` merges `theta_pre + alpha*tau` for the alpha sweep.
+     Use it when you want a full-weight vector rather than a LoRA branch.
 
-3. **Fixed neutral reference.** F5 clones the reference clip's own accent, which
-   would confound the alpha sweep. We hold the reference fixed and neutral across
-   all alpha so the vector is the only thing varying.
+   > Both tracks emit the identical `results/<accent>/alpha_<a>/utt####.wav`
+   > layout, so `evaluate` and every `rq*` analysis read them the same way. Note a
+   > LoRA snapshot cannot go through `extract`/`compose` (its delta lives in new
+   > adapter keys absent from the base, so the diff is empty) — scale it natively
+   > with `--lora` instead.
+
+3. **Native-language reference (paper-faithful).** F5 clones the reference clip,
+   so its accent feeds the output. Following the paper's cloning setup, we provide
+   a **native-language (L1) reference of the target accent** at inference, held
+   **fixed per accent across the alpha sweep** so the vector is the only thing that
+   varies within a sweep. The sweep then runs between two exact anchors: **alpha=0
+   is the pretrained model** (theta_pre) cloning the accent from the reference
+   alone, no fine-tuning; **alpha=1 is the fully fine-tuned model** (theta_pre +
+   tau), the full accent-vector impact. So the sweep measures the fine-tuning's
+   contribution as accent strength climbs from the base cloning level to the full
+   fine-tune, while speaker similarity should stay high.
 
 ## Setup (training needs a CUDA GPU)
 
@@ -83,8 +104,9 @@ VCTK_ROOT=/data/VCTK-Corpus-0.92 bash scripts/finetune.sh
 # 2. Extract the accent vector: tau = theta_ft - theta_pre  (Eq. 1-3)
 FINETUNED=.../ckpts/british/model_60000.pt bash scripts/extract_vector.sh
 
-# 3. Alpha sweep over held-out English transcripts, fixed neutral ref  (GPU)
-REF_AUDIO=refs/neutral.wav bash scripts/infer_sweep.sh
+# 3. Alpha sweep over held-out English transcripts, fixed native-language (L1) ref  (GPU)
+#    alpha=0 = pretrained model cloning the reference; alpha=1 = fully fine-tuned
+REF_AUDIO=refs/england.wav bash scripts/infer_sweep.sh
 
 # 4. Score the sweep with the repo eval suite -> metrics.csv  (Mac)
 bash scripts/evaluate.sh
@@ -99,8 +121,8 @@ monotonically with alpha while speaker similarity stays high (≈0.9 in the pape
 python main.py vector extract  --pretrained .../model_1250000.pt --finetuned .../model_60000.pt --out vectors/british.pt
 python main.py vector compose  --pretrained .../model_1250000.pt --vector vectors/british.pt --alpha 0.6 --out ckpts/british/a0.6.pt
 python main.py infer    --pretrained .../model_1250000.pt --vector vectors/british.pt --alphas 0,0.2,0.4,0.6,0.8,1.0 \
-                        --ref-audio refs/neutral.wav --ref-text "..." --transcripts transcripts/eval_transcripts.txt --out-dir results/british
-python main.py evaluate --sweep-dir results/british --transcripts transcripts/eval_transcripts.txt --ref-wav refs/neutral.wav --out-csv results/british/metrics.csv
+                        --ref-audio refs/england.wav --ref-text "..." --transcripts transcripts/eval_transcripts.txt --out-dir results/british
+python main.py evaluate --sweep-dir results/british --transcripts transcripts/eval_transcripts.txt --ref-wav refs/england.wav --out-csv results/british/metrics.csv
 ```
 
 ## Mixed accents (paper Eq. 5-6)
@@ -113,7 +135,7 @@ python main.py vector compose --pretrained .../model_1250000.pt \
     --vector vectors/british.pt --alpha 0.5 \
     --out ckpts/mixed/spanish+british.pt
 python main.py infer --ckpt ckpts/mixed/spanish+british.pt \
-    --ref-audio refs/neutral.wav --ref-text "..." \
+    --ref-audio refs/england.wav --ref-text "..." \
     --transcripts transcripts/eval_transcripts.txt --out-dir results/spanish+british
 ```
 
@@ -133,11 +155,16 @@ python main.py infer --ckpt ckpts/mixed/spanish+british.pt \
 accent_vector/
   data_preprocess.py   VCTK -> metadata.csv -> F5 Arrow dataset
   extract_vector.py    task-vector extract (Eq. 1-3) + arithmetic (Eq. 4-6)
-  infer_accent.py      alpha-sweep / single-ckpt inference, fixed neutral ref
-  evaluate.py          scores a sweep via SOTA_models_experiments eval suite
-scripts/               finetune / extract / infer / evaluate wrappers
+  infer_accent.py      alpha-sweep / single-ckpt inference, fixed native-L1 ref
+  evaluate.py          scores a sweep via the Evaluation/ eval suite
+  sample_checkpoints.py  RQ6: synthesise a fixed prompt at every LoRA snapshot
+  experiments/         dissertation RQ harness (see EXPERIMENTS.md);
+                       grid, rq1_reproduction, rq2_geometry, rq3_decomposition,
+                       rq3_layers, rq_temporal, viz_temporal, common
+scripts/               finetune(.sh) / finetune_lora(.sh) / extract / infer /
+                       evaluate wrappers
 transcripts/           held-out English eval transcripts (10 CMU ARCTIC sents)
-main.py                unified dispatcher over the stages
+main.py                unified dispatcher over the core stages (data/vector/infer/evaluate)
 ```
 
 `data/`, `vectors/`, `results/`, `refs/`, and any F5 checkpoints are generated
