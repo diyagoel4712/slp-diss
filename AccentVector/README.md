@@ -94,7 +94,7 @@ cd F5-TTS && pip install -e . && cd ..
 
 Every stage puts `$F5_ROOT/src` and this package on `PYTHONPATH` for you.
 
-## Pipeline (Phase A: British-accented English)
+## Pipeline 
 
 ```bash
 # 1. Fine-tune F5-TTS on VCTK England speech  -> theta_ft   (GPU)
