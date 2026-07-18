@@ -58,6 +58,7 @@ import tempfile
 from importlib.resources import files
 
 import soundfile as sf
+import torch
 from hydra.utils import get_class
 from omegaconf import OmegaConf
 
@@ -91,10 +92,17 @@ def synthesize_set(model, vocoder, mel_spec_type, ref_audio, ref_text,
                    transcripts, out_dir, nfe_step, seed, device, lora_idx=None):
     os.makedirs(out_dir, exist_ok=True)
     ref_audio, ref_text = preprocess_ref_audio_text(ref_audio, ref_text)
+    if lora_idx is not None and not torch.is_tensor(lora_idx):
+        # dit.py's forward always does lora_idx[0]; resolve_lora_idx/--lora-idx
+        # give a plain int, which trained via collate_fn's tensor would never be.
+        lora_idx = torch.tensor([lora_idx], device=device)
     for idx, gen_text in enumerate(transcripts):
+        # this fork's infer_process has no seed kwarg (unlike stock F5-TTS);
+        # seed identically via the RNG directly before each call instead.
+        torch.manual_seed(seed)
         wave, sr, _ = infer_process(
             ref_audio, ref_text, gen_text, model, vocoder,
-            mel_spec_type=mel_spec_type, nfe_step=nfe_step, seed=seed, device=device,
+            mel_spec_type=mel_spec_type, nfe_step=nfe_step, device=device,
             lora_idx=lora_idx,
         )
         sf.write(os.path.join(out_dir, f"utt{idx:04d}.wav"), wave, sr)

@@ -37,7 +37,14 @@ def base_state_dict(base_ckpt, device):
     The frozen backbone; LoRA keys are absent here and stay at init (zero effect)
     until a vector is overlaid.
     """
-    ckpt = torch.load(base_ckpt, map_location=device, weights_only=True)
+    if str(base_ckpt).endswith(".safetensors"):
+        # pretrained checkpoints ship as a flat safetensors file, not a torch
+        # pickle; wrap it the same way f5_tts.infer.utils_infer.load_checkpoint
+        # does so the ema_model_state_dict branch below picks it up.
+        from safetensors.torch import load_file
+        ckpt = {"ema_model_state_dict": load_file(base_ckpt, device=str(device))}
+    else:
+        ckpt = torch.load(base_ckpt, map_location=device, weights_only=True)
     if "model_state_dict" in ckpt:
         sd = ckpt["model_state_dict"]
     elif "ema_model_state_dict" in ckpt:

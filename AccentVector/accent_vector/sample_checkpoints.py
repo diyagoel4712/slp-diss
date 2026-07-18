@@ -55,7 +55,8 @@ def run(run_dir, base_ckpt, ref_audio, ref_text, gen_text, out_dir,
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
     # lora_idx for this accent (default 0 = the single LoRA trained here).
-    lora_idx = resolve_lora_idx(lora_label, run_dir / "lora_mapping.json")
+    # dit.py's forward always does lora_idx[0], so wrap the resolved int as a tensor.
+    lora_idx = torch.tensor([resolve_lora_idx(lora_label, run_dir / "lora_mapping.json")], device=device)
 
     snaps = _snapshots(snap_dir)
     if not snaps:
