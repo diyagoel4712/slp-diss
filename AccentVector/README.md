@@ -16,14 +16,13 @@ checkpoint difference as the *accent vector*, then scale it (accent strength) or
 add several together (mixed accents) and merge back into the base model before
 inference. No accented-English training data is required.
 
-See [`ADAPTATION_PLAN.md`](ADAPTATION_PLAN.md) for the full design rationale and
+See [`PROPOSAL.md`](PROPOSAL.md) for the full design rationale and
 phase sequencing.
 
 ## How this differs from the paper
 
 The paper uses XTTS-v2; we use F5-TTS (best model in our own benchmark, already
-set up in `Preliminary_test_results/f5-tts`). Two consequences, both verified
-against the installed F5-TTS:
+set up in `Preliminary_test_results/f5-tts`). Two consequences:
 
 1. **No language-ID token.** XTTS pins a `[lang]` token to English so the LoRA
    delta acts as an *accent* shift, not a language switch. F5-TTS has no such
@@ -56,10 +55,10 @@ against the installed F5-TTS:
    > adapter keys absent from the base, so the diff is empty) — scale it natively
    > with `--lora` instead.
 
-3. **Native-language reference (paper-faithful).** F5 clones the reference clip,
+3. **Native-language reference.** F5 clones the reference clip,
    so its accent feeds the output. Following the paper's cloning setup, we provide
    a **native-language (L1) reference of the target accent** at inference, held
-   **fixed per accent across the alpha sweep** so the vector is the only thing that
+   **fixed per speaker across the alpha sweep** so the vector is the only thing that
    varies within a sweep. The sweep then runs between two exact anchors: **alpha=0
    is the pretrained model** (theta_pre) cloning the accent from the reference
    alone, no fine-tuning; **alpha=1 is the fully fine-tuned model** (theta_pre +
@@ -74,7 +73,7 @@ used an A40). **Evaluation runs on the Mac.**
 
 F5-TTS lives at the repo-root **`F5-TTS/`** (the LoRA-capable fork). The scripts
 default `F5_ROOT` to `../F5-TTS`; override it to point elsewhere. For the LoRA
-path (recommended — see deviation #2) you need this fork's `F5TTS_v1_LoRA`
+path (as compared to full finetuning) you need this fork's `F5TTS_v1_LoRA`
 config; **stock `SWivid/F5-TTS` has no LoRA**, so only use it if you stick to the
 full fine-tune.
 
@@ -141,13 +140,11 @@ python main.py infer --ckpt ckpts/mixed/spanish+british.pt \
 
 ## Later phases
 
-- **Phase B — Vietnamese** (Latin script): supply your own `audio_file|text` CSV,
+- **For other accents**: supply your own `audio_file|text` CSV,
   run `data_preprocess prepare`, then the same fine-tune → extract → sweep flow.
-- **Phase C — Hindi / Arabic / Korean** (non-Latin): the F5 base vocab covers
+- **For non-Latin transcripts**: the F5 base vocab covers
   Latin + pinyin only, so native transcripts won't tokenize. Romanize the
-  transcripts or extend the vocab first (ADAPTATION_PLAN.md gotcha #2). Hindi is
-  worth the effort because GenAID actually classifies Indian → a validated
-  accent-ID number, not just embedding cosine.
+  transcripts or extend the vocab first.
 
 ## Layout
 
