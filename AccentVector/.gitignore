@@ -1,7 +1,9 @@
 # generated artifacts
 data/
+exps/
 vectors/
 results/
+wandb/
 refs/
 *.pt
 __pycache__/
