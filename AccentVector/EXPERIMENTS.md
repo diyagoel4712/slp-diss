@@ -9,8 +9,8 @@ all `rq*` modules run on the Mac against the grid's audio.
 | ID | What | How |
 |----|------|-----|
 | A0 | One LoRA fine-tune → one vector per accent `{british, spanish, vietnamese, +1 distant}` | `scripts/finetune_lora.sh` per accent; the vector is the final `lora_<step>.pt` snapshot (point the grid at it) |
-| A1 | Synthesis grid: accent × α sweep, per-accent **native-language (L1) reference** held fixed across α | `python -m accent_vector.experiments.grid --config grid.json --lora` |
-| A2 | Natural target-accent clips + GAE baseline clips (per accent) | data collection; endpoints for gap-closure / cs_accent |
+| A1 | Synthesis grid: accent × **speaker** × α sweep, each speaker's **native-language (L1) reference** held fixed across α → `results/<accent>/<speaker>/alpha_<a>/` | `python -m accent_vector.experiments.grid --config grid.json --lora` |
+| A2 | Natural target-accent clips + GAE baseline clips (per speaker) | data collection; endpoints for gap-closure / cs_accent |
 
 (Full-fine-tune track instead: `scripts/finetune.sh` → `scripts/extract_vector.sh` → `grid` without `--lora`, which merges each alpha.)
 
@@ -19,6 +19,27 @@ cloning), fixed across the sweep. **α=0 = θ_pre** — the pretrained model clo
 the reference alone (no fine-tuning); **α=1 = θ_ft** — the fully fine-tuned model. So the sweep
 measures the fine-tuning's contribution from the base cloning level up to the full fine-tune.
 Each accent's reference goes in the config's `references` block.
+
+**Data.**
+- *Train (A0):* per accent, ~100 h of **native-language (L1)** speech — one dataset or several
+  combined into a single `audio_file\|text` CSV (use **absolute** audio paths so one
+  `--audio-root` covers all sources), then `data_preprocess prepare`. Non-Latin L1 transcripts
+  (Hindi/Arabic/Korean) must be romanised (or the vocab extended) first — F5's base vocab won't
+  tokenise them. 100 h is ample for a rank-16 LoRA vector; the constraint is GPU-hours.
+- *Test:* a **bilingual** corpus (each speaker recorded in their L1 **and** in English) is ideal —
+  the L1 utterances are the cloning **references** (A1) and the natural **English** recordings are
+  the target-accent clips for `cs_accent` / PPG-KL / F0 (A2), same speaker for both. A
+  code-switching corpus works but needs segmenting into clean L1 vs English spans. Keep test
+  speakers **disjoint** from the A0 fine-tuning set (else speaker acoustics leak into the scores).
+  Optional: set the synth `gen_text` to the speakers' own English sentences for content-matched
+  natural-vs-synth pairs.
+- *Multiple speakers per accent* (consistency check): give the accent's `references` block one
+  entry **per speaker** — `"references": {"indian": {"p1": {...}, "p2": {...}}}` — and the grid
+  runs each speaker's sweep into `results/indian/<speaker>/`. Score each speaker with the rq*
+  modules (its own L1 reference + natural English), then pool them across speakers with
+  `experiments.aggregate` (writes `by_speaker.csv` + `aggregate.csv` = per-α mean ± spread; a
+  small spread ⇒ consistent across speakers). No `lora_mapping` needed — single-accent vectors
+  default to LoRA idx 0.
 
 ## Experiments (CPU / Mac, over the A1 grid)
 
@@ -37,7 +58,7 @@ Each accent's reference goes in the config's `references` block.
 | E3.4 | RQ3 | `rq3_layers` | `rq3_layers.csv` | accent energy concentrates in identifiable modules/depth |
 | E4.1 | RQ4* | `extract_vector compose --include` + `rq3_decomposition` | `rq3.csv` | up-weighting prosody-layers raises supra_closure |
 | E4.2 | RQ4* | reference retrieval (stub) + `rq3` | — | matched reference raises supra transfer |
-| E6.1 | RQ6 | `rq_temporal` | `temporal.csv` | `cos(τ_t, τ_final)` converges before magnitude (direction learnable early) |
+| E6.1 | RQ6 | `rq6_temporal` | `temporal.csv` | `cos(τ_t, τ_final)` converges before magnitude (direction learnable early) |
 
 `*` RQ4 is the stretch tier. **E6.1 is Tier-1 only** (optimisation trajectory,
 near-free): needs intermediate `model_<step>.pt` checkpoints saved during A0.
@@ -62,17 +83,25 @@ error bounds) is out of scope — step ≠ data amount.
 
 ```bash
 # after A0 produces the LoRA snapshots and a grid.json listing them:
-python -m accent_vector.experiments.grid --config grid.json --lora             # A1
+python -m accent_vector.experiments.grid --config grid.json --lora             # A1 -> results/<accent>/<speaker>/
 
-python -m accent_vector.experiments.rq1_reproduction --sweep-dir results/british ...   # E1
-python -m accent_vector.experiments.rq3_decomposition --sweep-dir results/british \
-    --natural-ref data/england_natural --out-csv results/british/rq3.csv               # E3 (core)
-python -m accent_vector.experiments.rq3_layers --vector vectors/british.pt \
-    --out-csv results/british/rq3_layers.csv                                           # E3.4
-python -m accent_vector.experiments.rq2_geometry --vector british=vectors/british.pt \
-    --vector spanish=vectors/spanish.pt --synth british=results/british/alpha_1.0 \
-    --synth spanish=results/spanish/alpha_1.0 --out-dir results/geometry               # E2
-python -m accent_vector.experiments.rq_temporal --lora \
-    --ckpt-dir exps/F5TTS_v1_LoRA_british/<run>/ckpts/snapshots \
-    --out-csv results/british/temporal.csv                                             # E6
+# E1 + E3 (core): score each speaker with ITS own L1 reference + natural clips, then pool
+for s in results/indian/*/; do sp=$(basename "$s")
+  python -m accent_vector.experiments.rq1_reproduction --sweep-dir "$s" \
+      --transcripts transcripts/eval_transcripts.txt --ref-wav refs/indian/$sp.wav \
+      --accent-ref natural/indian/$sp --target-accent Indian --out-csv "$s/rq1.csv"
+  python -m accent_vector.experiments.rq3_decomposition --sweep-dir "$s" \
+      --natural-ref natural/indian/$sp --out-csv "$s/rq3.csv"
+done
+python -m accent_vector.experiments.aggregate --accent-dir results/indian --csv-name rq1.csv --out-dir results/indian
+python -m accent_vector.experiments.aggregate --accent-dir results/indian --csv-name rq3.csv --out-dir results/indian
+
+python -m accent_vector.experiments.rq3_layers --vector vectors/indian.pt \
+    --out-csv results/indian/rq3_layers.csv                                            # E3.4 (vector-only)
+python -m accent_vector.experiments.rq2_geometry --vector indian=vectors/indian.pt \
+    --vector spanish=vectors/spanish.pt --synth indian=results/indian/p1/alpha_1.0 \
+    --synth spanish=results/spanish/s1/alpha_1.0 --out-dir results/geometry            # E2
+python -m accent_vector.experiments.rq6_temporal --lora \
+    --ckpt-dir exps/F5TTS_v1_LoRA_indian/<run>/ckpts/snapshots \
+    --out-csv results/indian/temporal.csv                                             # E6
 ```

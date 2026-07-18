@@ -10,9 +10,14 @@ sweep, so within an accent only alpha varies:
 So the sweep interpolates from "how much accent the base model copies from the
 reference" up to "the full fine-tuning impact"; speaker identity should hold across it.
 
-Reads a small JSON config, then invokes ``accent_vector.infer_accent`` per accent
-(subprocess, so no GPU import until a sweep runs). Downstream analyses read
-results/<accent>/alpha_<a>/utt####.wav.
+Several speakers per accent (a consistency check): each accent maps to one vector
+but a set of per-speaker L1 references, so every speaker runs the same sweep with
+its own reference. Output is grouped by accent then speaker:
+
+    results/<accent>/<speaker>/alpha_<a>/utt####.wav
+
+Reads a small JSON config, then invokes ``accent_vector.infer_accent`` per
+(accent, speaker) (subprocess, so no GPU import until a sweep runs).
 
 Vector track (--lora): with --lora, "accents" map to LoRA vectors and the sweep
 scales the LoRA branch natively (no merge); needs "lora_config" + "vocab" from the
@@ -25,15 +30,20 @@ Config (JSON):
       "transcripts": "transcripts/eval_transcripts.txt",
       "alphas": "0,0.2,0.4,0.6,0.8,1.0",
       "out_root": "results",
-      "accents": {"british": "vectors/british.pt", "spanish": "vectors/spanish.pt"},
-      "references": {                               # native-language (L1) reference per accent
-        "british": {"audio": "refs/england_L1.wav", "text": "..."},
-        "spanish": {"audio": "refs/spanish_L1.wav", "text": "..."}
+      "accents": {"indian": "vectors/indian.pt", "spanish": "vectors/spanish.pt"},
+      "references": {          # per accent, one native-language (L1) reference per speaker
+        "indian":  {"p1": {"audio": "refs/indian/p1.wav", "text": "..."},
+                    "p2": {"audio": "refs/indian/p2.wav", "text": "..."}},
+        "spanish": {"s1": {"audio": "refs/spanish/s1.wav", "text": "..."}}
       },
       "lora_config": "exps/.../config.yaml",        # --lora only
       "vocab": "exps/.../vocab.txt",                # --lora only
       "lora_mapping": "exps/.../lora_mapping.json"  # --lora only, optional
     }
+
+A single speaker may also be given in the flat form ``{"audio": ..., "text": ...}``
+(treated as speaker "main"). Score each speaker with the rq* modules, then pool
+them across speakers with ``aggregate``.
 
     python -m accent_vector.experiments.grid --config grid.json [--lora] [--dry-run]
 """
@@ -45,17 +55,22 @@ import sys
 from pathlib import Path
 
 
-def _reference_for(accent, cfg):
-    """(ref_audio, ref_text) -- this accent's native-language (L1) reference clip,
-    held fixed across the accent's alpha sweep."""
+def _speaker_refs(accent, cfg):
+    """[(speaker, ref_audio, ref_text)] -- this accent's per-speaker native-language
+    (L1) references, each held fixed across that speaker's alpha sweep.
+
+    Accepts the speaker-keyed form ``references[accent] = {spk: {audio, text}}`` or a
+    single flat ``{audio, text}`` (one speaker "main")."""
     refs = cfg.get("references", {})
     if accent not in refs:
         raise SystemExit(
-            f"references['{accent}'] (audio+text) missing from the config; each "
-            f"accent needs its native-language (L1) reference clip"
+            f"references['{accent}'] missing from the config; each accent needs at "
+            f"least one native-language (L1) reference clip"
         )
-    r = refs[accent]
-    return r["audio"], r["text"]
+    block = refs[accent]
+    if "audio" in block and "text" in block:      # flat single-speaker form
+        block = {"main": block}
+    return [(spk, r["audio"], r["text"]) for spk, r in block.items()]
 
 
 def _sweep_cmd(accent, vector, cfg, ref_audio, ref_text, out_dir, lora):
@@ -84,12 +99,12 @@ def build_grid(cfg, dry_run=False, lora=False):
     out_root = Path(cfg.get("out_root", "results"))
     track = "lora" if lora else "merged"
     for accent, vector in cfg["accents"].items():
-        ref_audio, ref_text = _reference_for(accent, cfg)
-        cmd = _sweep_cmd(accent, vector, cfg, ref_audio, ref_text,
-                         str(out_root / accent), lora)
-        print(f"[grid:{track}] {accent} (ref={ref_audio}): {' '.join(cmd)}")
-        if not dry_run:
-            subprocess.run(cmd, check=True)
+        for speaker, ref_audio, ref_text in _speaker_refs(accent, cfg):
+            out_dir = out_root / accent / speaker
+            cmd = _sweep_cmd(accent, vector, cfg, ref_audio, ref_text, str(out_dir), lora)
+            print(f"[grid:{track}] {accent}/{speaker} (ref={ref_audio}): {' '.join(cmd)}")
+            if not dry_run:
+                subprocess.run(cmd, check=True)
 
 
 def main():

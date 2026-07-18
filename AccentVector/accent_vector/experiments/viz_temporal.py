@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 
 from accent_vector.experiments import shared
-from AccentVector.accent_vector.experiments.rq6_temporal import collect_checkpoints, _vector_1d_lora
+from accent_vector.experiments.rq6_temporal import collect_checkpoints, _vector_1d_lora
 
 
 def _load_trajectory(ckpt_dir, include, exclude):

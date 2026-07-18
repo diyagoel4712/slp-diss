@@ -11,9 +11,11 @@ Two stages:
    ``audio_file|text`` CSV directly and skip straight to ``prepare``.
 
 2. ``prepare`` -- tokenize transcripts and write the F5 Arrow dataset
-   (``raw.arrow`` + ``duration.json`` + ``vocab.txt``) that ``finetune_cli.py``
-   consumes. This mirrors F5's own ``prepare_csv_wavs.py`` and reuses the
-   pretrained vocab for fine-tuning.
+   (``train.arrow``/``train_duration.json`` + ``valid.arrow``/``valid_duration.json``
+   + ``vocab.txt``) that ``finetune_cli.py`` consumes -- this fork's trainer loads
+   a pre-split train/valid pair (``load_dataset(..., audio_type="train"|"valid")``),
+   not a single ``raw.arrow``. The split is controlled by ``--val-frac`` (default
+   0.1, floored at 1 clip). Reuses the pretrained vocab for fine-tuning.
 
 The tokenizer is F5's default ``pinyin`` map; for English text
 ``convert_char_to_pinyin`` passes letters through unchanged, so it is the right
@@ -51,6 +53,18 @@ from f5_tts.model.utils import convert_char_to_pinyin
 PRETRAINED_VOCAB_PATH = files("f5_tts").joinpath("../../data/vocab.txt")
 MAX_WORKERS = max(1, multiprocessing.cpu_count() - 1)
 MIN_DURATION_S = 3.0  # paper Section 4.2: discard utterances < 3 s
+
+
+def audio_duration(path):
+    """Clip duration in seconds. Prefers torchaudio.info (present on the cluster's
+    pinned torch 2.4); falls back to soundfile on newer torchaudio (>=2.9 removed
+    torchaudio.info), so data prep also runs on a local Mac env."""
+    if hasattr(torchaudio, "info"):
+        info = torchaudio.info(str(path))
+        return info.num_frames / info.sample_rate
+    import soundfile as sf
+    info = sf.info(str(path))
+    return info.frames / info.samplerate
 
 
 # --- stage 1: VCTK -> audio_file|text metadata ------------------------------
@@ -112,8 +126,7 @@ def build_vctk_metadata(vctk_root, accent, out_csv, min_duration=MIN_DURATION_S)
                 skipped_missing += 1
                 continue
             try:
-                info = torchaudio.info(str(audio))
-                duration = info.num_frames / info.sample_rate
+                duration = audio_duration(audio)
             except Exception:
                 skipped_missing += 1
                 continue
@@ -153,7 +166,8 @@ def read_audio_text_pairs(csv_path, audio_root):
     return pairs
 
 
-def prepare_dataset(metadata_csv, audio_root, out_dir, is_finetune=True, lora_label=None):
+def prepare_dataset(metadata_csv, audio_root, out_dir, is_finetune=True, lora_label=None,
+                     val_frac=0.1):
     pairs = read_audio_text_pairs(metadata_csv, audio_root)
     if not pairs:
         raise RuntimeError(f"No usable rows in {metadata_csv}")
@@ -171,8 +185,7 @@ def prepare_dataset(metadata_csv, audio_root, out_dir, is_finetune=True, lora_la
             print(f"[prepare] missing audio, skipping: {audio_path}")
             continue
         try:
-            info = torchaudio.info(audio_path)
-            duration = info.num_frames / info.sample_rate
+            duration = audio_duration(audio_path)
         except Exception as e:
             print(f"[prepare] cannot read {audio_path}: {e}")
             continue
@@ -187,13 +200,27 @@ def prepare_dataset(metadata_csv, audio_root, out_dir, is_finetune=True, lora_la
         durations.append(duration)
         vocab_set.update(list(conv_text))
 
+    # split train/valid: this fork's finetune_cli.py loads pre-split
+    # train.arrow/valid.arrow (+ matching *_duration.json), not a single raw.arrow.
+    n_valid = max(1, round(len(result) * val_frac)) if len(result) > 1 else 0
+    valid_result, valid_durations = result[:n_valid], durations[:n_valid]
+    train_result, train_durations = result[n_valid:], durations[n_valid:]
+    if not train_result:
+        train_result, train_durations = result, durations
+        valid_result, valid_durations = result, durations
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    with ArrowWriter(path=(out_dir / "raw.arrow").as_posix(), writer_batch_size=100) as writer:
-        for line in tqdm(result, desc="writing raw.arrow"):
-            writer.write(line)
-    with open(out_dir / "duration.json", "w", encoding="utf-8") as f:
-        json.dump({"duration": durations}, f, ensure_ascii=False)
+    for split_name, split_rows, split_durations in (
+        ("train", train_result, train_durations),
+        ("valid", valid_result, valid_durations),
+    ):
+        with ArrowWriter(path=(out_dir / f"{split_name}.arrow").as_posix(), writer_batch_size=100) as writer:
+            for line in tqdm(split_rows, desc=f"writing {split_name}.arrow"):
+                writer.write(line)
+            writer.finalize()  # write schema/footer; the `with` exit alone leaves a 0-byte file
+        with open(out_dir / f"{split_name}_duration.json", "w", encoding="utf-8") as f:
+            json.dump({"duration": split_durations}, f, ensure_ascii=False)
 
     vocab_out = out_dir / "vocab.txt"
     if is_finetune:
@@ -207,7 +234,8 @@ def prepare_dataset(metadata_csv, audio_root, out_dir, is_finetune=True, lora_la
                 f.write(v + "\n")
 
     print(
-        f"[prepare] {out_dir.name}: {len(result)} samples, "
+        f"[prepare] {out_dir.name}: {len(result)} samples "
+        f"({len(train_result)} train / {len(valid_result)} valid), "
         f"{sum(durations) / 3600:.2f} h, vocab {len(vocab_set)} -> {out_dir}"
     )
     return out_dir
@@ -232,6 +260,9 @@ def _build_parser():
     p_p.add_argument("--lora-label", type=int, default=None,
                      help="write a constant per-sample lora_label (required for LoRA "
                           "training; a single-accent run uses one label, e.g. 0)")
+    p_p.add_argument("--val-frac", type=float, default=0.1,
+                     help="fraction of clips held out as train.arrow/valid.arrow split "
+                          "(finetune_cli.py requires both; min 1 clip)")
     return parser
 
 
@@ -244,6 +275,7 @@ def main():
             args.metadata, args.audio_root, args.out_dir,
             is_finetune=not args.no_finetune_vocab,
             lora_label=args.lora_label,
+            val_frac=args.val_frac,
         )
 
 

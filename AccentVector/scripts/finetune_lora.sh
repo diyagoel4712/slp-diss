@@ -24,7 +24,7 @@ LORA_LABEL=${LORA_LABEL:-0}                       # single accent -> one label
 DATA_DIR="$F5_ROOT/data/${ACCENT_NAME}_pinyin"    # finetune_cli expects <name>_pinyin/
 
 # 1. metadata.csv -> F5 Arrow dataset WITH a constant lora_label (skip if present).
-if [ ! -f "$DATA_DIR/raw.arrow" ]; then
+if [ ! -f "$DATA_DIR/train.arrow" ]; then
     METADATA_CSV=${METADATA_CSV:?dataset not prepared; set METADATA_CSV=<audio_file|text csv>}
     AUDIO_ROOT=${AUDIO_ROOT:?set AUDIO_ROOT (prefix joined to CSV audio paths)}
     python -m accent_vector.data_preprocess prepare \

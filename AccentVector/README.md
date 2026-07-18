@@ -42,7 +42,7 @@ set up in `Preliminary_test_results/f5-tts`). Two consequences:
      The whole analysis pipeline runs on it — `infer_accent --lora` (and
      `grid --lora`) build the base+LoRA model **once** and rescale the branch per
      alpha in place (`accent_vector/lora_model.py`), feeding RQ1–RQ3, plus the RQ6
-     trajectory tooling (`sample_checkpoints.py`, `rq_temporal --lora`,
+     trajectory tooling (`sample_checkpoints.py`, `rq6_temporal --lora`,
      `viz_temporal`). This is the paper-matching, default track.
    - **Full fine-tune** (`finetune.sh`, `F5TTS_v1_Base`): the path
      Expressive-Vectors exercises end-to-end; `extract_vector` diffs the full
@@ -138,13 +138,26 @@ python main.py infer --ckpt ckpts/mixed/spanish+british.pt \
     --transcripts transcripts/eval_transcripts.txt --out-dir results/spanish+british
 ```
 
-## Later phases
+## Data & later phases
 
-- **For other accents**: supply your own `audio_file|text` CSV,
-  run `data_preprocess prepare`, then the same fine-tune → extract → sweep flow.
-- **For non-Latin transcripts**: the F5 base vocab covers
-  Latin + pinyin only, so native transcripts won't tokenize. Romanize the
-  transcripts or extend the vocab first.
+- **Train (per accent):** ~100 h of **native-language (L1)** speech — one dataset or
+  several combined into a single `audio_file|text` CSV (use **absolute** audio paths so
+  one `--audio-root` covers every source), then `data_preprocess prepare` → fine-tune →
+  sweep. 100 h is ample for a rank-16 LoRA vector.
+- **Test:** a **bilingual** corpus (each speaker recorded in their L1 **and** in English)
+  is ideal — the L1 clips are the cloning references, the natural English recordings are
+  the target-accent clips for `cs_accent`/PPG-KL/F0, same speaker for both. Code-switching
+  data works but must be segmented into clean L1 vs English spans. Keep test speakers
+  **disjoint** from the fine-tuning set.
+- **Several speakers per accent:** give the accent's `references` block one entry per speaker
+  (see `grid.py`); the grid sweeps each into `results/<accent>/<speaker>/`. Score each speaker
+  with the `rq*` modules, then pool across speakers with `experiments.aggregate` (per-α mean ±
+  spread) for a consistency check.
+- **Non-Latin transcripts:** the F5 base vocab covers Latin + pinyin only, so Hindi/Arabic/
+  Korean L1 transcripts won't tokenize — romanize them or extend the vocab **before**
+  fine-tuning.
+
+See [EXPERIMENTS.md](EXPERIMENTS.md) → *Data* for the full breakdown.
 
 ## Layout
 
@@ -157,7 +170,7 @@ accent_vector/
   sample_checkpoints.py  RQ6: synthesise a fixed prompt at every LoRA snapshot
   experiments/         dissertation RQ harness (see EXPERIMENTS.md);
                        grid, rq1_reproduction, rq2_geometry, rq3_decomposition,
-                       rq3_layers, rq_temporal, viz_temporal, common
+                       rq3_layers, rq6_temporal, viz_temporal, shared
 scripts/               finetune(.sh) / finetune_lora(.sh) / extract / infer /
                        evaluate wrappers
 transcripts/           held-out English eval transcripts (10 CMU ARCTIC sents)

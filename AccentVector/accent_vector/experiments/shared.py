@@ -3,7 +3,7 @@
     load_eval                     eval-suite bridge      (rq1, rq2, rq3)
     alpha_dirs, wavs_in           synthesis-grid IO      (rq1, rq2, rq3)
     cosine_matrix, classical_mds  vector geometry        (rq2, viz_temporal)
-    leakage_onset                 threshold crossing     (rq1, rq_temporal)
+    leakage_onset                 threshold crossing     (rq1, rq6_temporal)
 
 Single-use helpers live in the RQ module that uses them: the vector flattener and
 Mantel test in rq2_geometry; the voicing-rhythm math and gap-closure in

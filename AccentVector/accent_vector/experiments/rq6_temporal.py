@@ -23,7 +23,7 @@ Tip: pass ``--include ema_model_state_dict`` to track the weights inference
 actually uses; optimizer moments are dropped by default (they aren't part of the
 accent vector and would pollute magnitude/direction).
 
-    python -m accent_vector.experiments.rq_temporal \
+    python -m accent_vector.experiments.rq6_temporal \
         --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt \
         --ckpt-dir ckpts/british --include ema_model_state_dict \
         --out-csv results/british/temporal.csv
@@ -31,7 +31,7 @@ accent vector and would pollute magnitude/direction).
 For a LoRA fine-tune the accent vector IS the LoRA weights, so pass ``--lora`` and
 point ``--ckpt-dir`` at the snapshots dir (no ``--pretrained`` needed):
 
-    python -m accent_vector.experiments.rq_temporal --lora \
+    python -m accent_vector.experiments.rq6_temporal --lora \
         --ckpt-dir exps/F5TTS_v1_LoRA_british/<run>/ckpts/snapshots \
         --out-csv results/british/temporal.csv
 """
