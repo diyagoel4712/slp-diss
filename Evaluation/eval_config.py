@@ -11,7 +11,7 @@ import zipfile
 # repo layout
 REPO      = Path(__file__).resolve().parents[1]
 L2_ARCTIC = REPO / "Datasets" / "L2-ARCTIC"
-SOTA      = REPO / "SOTA_models_experiments"
+SOTA      = REPO / "Evaluation"
 PROMPTS   = SOTA / "arctic.data"          # CMU ARCTIC id -> prompt text
 
 # --- the 10 evaluation utterances: CMU ARCTIC id -> reference text ---
