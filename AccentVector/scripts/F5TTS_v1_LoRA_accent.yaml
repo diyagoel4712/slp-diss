@@ -1,0 +1,71 @@
+hydra:
+  run:
+    dir: exps/${model.name}_${datasets.name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+
+# One-accent-at-a-time LoRA fine-tune for the accent-vector work.
+# Same LoRA arch as F5TTS_v1_LoRA.yaml, but the optim/ckpt cadence is retuned for a
+# SMALL single-accent corpus (the base LoRA recipe inherits Emilia-scale numbers).
+# Override per accent on the CLI, e.g.:
+#   python src/f5_tts/train/finetune_cli.py --config-name F5TTS_v1_LoRA_accent \
+#       datasets.name=british ckpts.pretrain=ckpts/F5TTS_v1_Base/model_1250000.pt \
+#       datasets.batch_size_per_gpu=9600
+
+datasets:
+  name: accent            # set per accent on the CLI; expects data/${name}_pinyin/
+  batch_size_per_gpu: 9600  # frames/gpu; small-corpus single-GPU default (was 38400 for 8 GPUs)
+  batch_size_type: frame  # frame | sample
+  max_samples: 32         # max sequences per batch under frame batching
+  num_workers: 8
+
+optim:
+  epochs: 100             # generous budget; you stop manually via the STOP sentinel file
+  learning_rate: 1e-4     # small-corpus LoRA lr
+  num_warmup_updates: 200  # was 20000 (Emilia-scale); far fewer updates on one accent
+  grad_accumulation_steps: 1
+  max_grad_norm: 1.0
+  bnb_optimizer: False
+
+model:
+  name: F5TTS_v1_LoRA
+  tokenizer: pinyin
+  tokenizer_path: null
+  tokenized: False
+  backbone: DiT
+  arch:
+    dim: 1024
+    depth: 22
+    heads: 16
+    ff_mult: 2
+    text_dim: 512
+    text_mask_padding: True
+    qk_norm: null
+    conv_layers: 4
+    pe_attn_head: null
+    attn_backend: torch  # torch | flash_attn
+    attn_mask_enabled: False
+    checkpoint_activations: False
+    use_lora: True
+    lora_rank: 64
+    lora_feature_dim: null  # single LoRA per run (one accent -> one vector)
+  mel_spec:
+    target_sample_rate: 24000
+    n_mel_channels: 100
+    hop_length: 256
+    win_length: 1024
+    n_fft: 1024
+    mel_spec_type: vocos  # vocos | bigvgan
+  vocoder:
+    is_local: False
+    local_path: null
+
+ckpts:
+  pretrain: null          # REQUIRED: set ckpts.pretrain=<base F5TTS checkpoint> on the CLI
+  logger: wandb           # wandb | tensorboard | null
+  wandb_project: accent_vector_lora
+  wandb_run_name: ${model.name}_${datasets.name}
+  log_samples: True       # dump a gen/ref wav each save_per_updates
+  save_per_updates: 500   # samples + valid-eval + model_last cadence
+  snapshot_per_updates: 100  # cheap LoRA-only snapshot cadence -> RQ6 trajectory granularity
+  keep_last_n_checkpoints: -1  # keep all (snapshots are tiny; full model_last is overwritten)
+  last_per_updates: 500
+  save_dir: ${hydra:run.dir}

@@ -15,11 +15,20 @@ Usage
 -----
     python scripts/patch_f5_tts_fork.py [--f5-root /path/to/F5-TTS]
 
+Also installs F5TTS_v1_LoRA_accent.yaml itself if it's missing: that config
+isn't part of the upstream Expressive-Vectors fork at all -- it's a config
+custom-authored for this dissertation's small-single-accent recipe (layered
+over the fork's own F5TTS_v1_LoRA.yaml), so a fresh clone never has it. This
+script carries the fixed copy (scripts/F5TTS_v1_LoRA_accent.yaml, tracked in
+git alongside this script) and copies it into place if absent.
+
 Bugs fixed (all in F5-TTS/src, discovered running the toy LoRA pipeline on a
 Mac -- see AccentVector conversation history for full crash traces):
 
 1. F5TTS_v1_LoRA_accent.yaml: `lora_feature_dim: None` is YAML's string
-   "None", not a null -- crashes range() in LoRALinear.__init__.
+   "None", not a null -- crashes range() in LoRALinear.__init__. (Fixed at
+   the source -- see the "installs if missing" note above -- so this no
+   longer needs a separate search-and-replace patch.)
 2. finetune_cli.py: `to_absolute_path(config.model.vocoder.local_path)` is
    called unconditionally; local_path is legitimately None whenever
    `is_local: False` (the default), and Path(None) crashes.
@@ -39,15 +48,14 @@ Mac -- see AccentVector conversation history for full crash traces):
 
 import argparse
 import os
+import shutil
 import sys
 
+# Not part of the upstream fork -- installed fresh (already fixed) if absent.
+CONFIG_TEMPLATE = "F5TTS_v1_LoRA_accent.yaml"
+CONFIG_DEST = "src/f5_tts/configs/F5TTS_v1_LoRA_accent.yaml"
+
 PATCHES = [
-    dict(
-        file="src/f5_tts/configs/F5TTS_v1_LoRA_accent.yaml",
-        desc="lora_feature_dim: None (string) -> null (YAML null)",
-        old="    lora_feature_dim: None  # single LoRA per run (one accent -> one vector)",
-        new="    lora_feature_dim: null  # single LoRA per run (one accent -> one vector)",
-    ),
     dict(
         file="src/f5_tts/train/finetune_cli.py",
         desc="guard to_absolute_path() against vocoder.local_path=None",
@@ -95,6 +103,25 @@ PATCHES = [
 ]
 
 
+def install_config(f5_root):
+    """Copy the fixed F5TTS_v1_LoRA_accent.yaml into place if the fork doesn't
+    have it -- it's dissertation-authored, not upstream, so a fresh clone
+    never ships it. No-op (reports already-present) if it's already there."""
+    dest = os.path.join(f5_root, CONFIG_DEST)
+    if os.path.isfile(dest):
+        print(f"[OK]   {CONFIG_DEST}: already present")
+        return "already"
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), CONFIG_TEMPLATE)
+    if not os.path.isfile(src):
+        print(f"[WARN] {CONFIG_DEST}: missing, and template {src} not found either -- "
+              f"copy it by hand.")
+        return "diverged"
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    shutil.copy2(src, dest)
+    print(f"[APPLIED] {CONFIG_DEST}: installed (dissertation-authored, not upstream)")
+    return "applied"
+
+
 def apply_patch(f5_root, patch):
     path = os.path.join(f5_root, patch["file"])
     if not os.path.isfile(path):
@@ -135,7 +162,8 @@ def main():
     f5_root = os.path.abspath(args.f5_root)
 
     print(f"Patching F5-TTS fork at {f5_root}\n")
-    results = [apply_patch(f5_root, p) for p in PATCHES]
+    results = [install_config(f5_root)]
+    results += [apply_patch(f5_root, p) for p in PATCHES]
 
     n_diverged = results.count("diverged") + results.count("ambiguous")
     n_missing = results.count("missing")
