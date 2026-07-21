@@ -225,7 +225,6 @@ __marimo__/
 .DS_Store
 
 # Raw datasets / corpora (VCTK etc.) — far too large for git
-Datasets/
 vctk/
 arctic.data
 
