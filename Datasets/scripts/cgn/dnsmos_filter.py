@@ -48,8 +48,9 @@ def main():
                     help="dir containing metadata.csv and wavs/ (from prep_cgn_f5.py)")
     ap.add_argument("--min", type=float, default=3.4,
                     help="DNSMOS threshold; paper Section 4.2 uses 3.4")
-    ap.add_argument("--metric", choices=("ovrl", "sig", "bak", "p808"), default="ovrl",
-                    help="which DNSMOS score to threshold on (default ovrl, P.835 overall)")
+    ap.add_argument("--metric", choices=("ovrl", "sig", "bak", "p808"), default="p808",
+                    help="which DNSMOS score to threshold on; default p808 = the single-score "
+                         "DNSMOS (P.808) the paper cites [36]. All four are logged regardless.")
     ap.add_argument("--out", default=None,
                     help="filtered CSV path (default <clips>/metadata.dnsmos.csv)")
     args = ap.parse_args()
@@ -65,22 +66,23 @@ def main():
         rows = [row for row in r if len(row) >= 2]
     print(f"scoring {len(rows)} clips (DNSMOS {args.metric} >= {args.min})", file=sys.stderr)
 
+    metrics = ("ovrl", "sig", "bak", "p808")       # log all so we can re-threshold cheaply
     kept = []
     n_drop = 0
     with open(clips / "dnsmos_scores.tsv", "w", encoding="utf-8") as sf:
-        sf.write(f"audio_file\t{args.metric}\n")
+        sf.write("audio_file\t" + "\t".join(metrics) + "\n")
         for i, (rel, text) in enumerate(rows, 1):
             wav = clips / rel
             try:
                 # pass the path: speechmos reads + resamples to 16 kHz internally
                 result = dnsmos.run(str(wav), 16000)
-                mos = score_metric(result, args.metric)
+                scores = {m: score_metric(result, m) for m in metrics}
             except Exception as e:
                 print(f"! scoring failed for {rel}: {e}", file=sys.stderr)
                 n_drop += 1
                 continue
-            sf.write(f"{rel}\t{mos:.3f}\n")
-            if mos >= args.min:
+            sf.write(rel + "\t" + "\t".join(f"{scores[m]:.3f}" for m in metrics) + "\n")
+            if scores[args.metric] >= args.min:
                 kept.append((rel, text))
             else:
                 n_drop += 1
