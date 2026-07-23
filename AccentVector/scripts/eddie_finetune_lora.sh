@@ -18,6 +18,7 @@
 #$ -e logs/ft.$JOB_ID.err
 #$ -P ppls_slpgpu
 #$ -M s2247837@ed.ac.uk
+#$ -m eab                    # email on end (e) and abort (a); add 'b' for begin
 
 set -euo pipefail
 
