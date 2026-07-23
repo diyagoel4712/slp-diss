@@ -44,7 +44,7 @@ export F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}          # confirm F5-TTS loc
 export ACCENT_NAME=${ACCENT_NAME:-dutch}
 export METADATA_CSV=${METADATA_CSV:-/exports/eddie/scratch/s2247837/data/cgn_dutch_clips/metadata.dnsmos.csv}
 export AUDIO_ROOT=${AUDIO_ROOT:-/exports/eddie/scratch/s2247837/data/cgn_dutch_clips}
-export PRETRAIN=${PRETRAIN:-"$F5_ROOT/ckpts/F5TTS_v1_Base/model_1250000.pt"}
+export PRETRAIN=${PRETRAIN:-/exports/eddie/scratch/s2247837/ckpts/F5TTS_v1_Base/model_1250000.safetensors}
 export CKPT_ROOT=${CKPT_ROOT:-/exports/eddie/scratch/s2247837/accentvector-exps}
 export LORA_LABEL=${LORA_LABEL:-0}
 # base vocab, without staging a file into the F5-TTS tree (prepare reads F5_VOCAB)
