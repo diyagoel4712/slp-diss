@@ -40,6 +40,7 @@ import argparse
 import csv
 import json
 import multiprocessing
+import os
 import shutil
 from importlib.resources import files
 from pathlib import Path
@@ -50,7 +51,9 @@ from tqdm import tqdm
 
 from f5_tts.model.utils import convert_char_to_pinyin
 
-PRETRAINED_VOCAB_PATH = files("f5_tts").joinpath("../../data/vocab.txt")
+# Env override lets you point at the base vocab without staging a file into the
+# F5-TTS tree (e.g. F5_VOCAB=$F5_ROOT/examples/vocab.txt); default is unchanged.
+PRETRAINED_VOCAB_PATH = os.environ.get("F5_VOCAB") or files("f5_tts").joinpath("../../data/vocab.txt")
 MAX_WORKERS = max(1, multiprocessing.cpu_count() - 1)
 MIN_DURATION_S = 3.0  # paper Section 4.2: discard utterances < 3 s
 
