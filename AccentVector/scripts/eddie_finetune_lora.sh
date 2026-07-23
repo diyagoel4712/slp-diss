@@ -33,6 +33,8 @@ conda activate f5-tts       # your F5-TTS env
 # so default to tensorboard: fully local, no key, event files under runs/lora_<accent>.
 export WANDB_MODE=${WANDB_MODE:-offline}
 export LOGGER=${LOGGER:-tensorboard}
+# no internet on the node: never let a stray HF call hang the GPU -- fail fast.
+export HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-1}
 
 # SGE runs a spooled COPY of this script, so $0 is not the scripts/ path. With
 # -cwd the submission dir (AccentVector) is SGE_O_WORKDIR; fall back to $PWD when
@@ -49,6 +51,11 @@ export CKPT_ROOT=${CKPT_ROOT:-/exports/eddie/scratch/s2247837/accentvector-exps}
 export LORA_LABEL=${LORA_LABEL:-0}
 # base vocab, without staging a file into the F5-TTS tree (prepare reads F5_VOCAB)
 export F5_VOCAB=${F5_VOCAB:-"$F5_ROOT/examples/vocab.txt"}
+# vocoder for log_samples: pre-downloaded to scratch so the offline node uses it
+# locally (dir must hold config.yaml + pytorch_model.bin). NUM_WORKERS defaults to
+# 1 -- the gpu=1 allocation grants 1 CPU core, so more workers just oversubscribe.
+VOCODER_DIR=${VOCODER_DIR:-/exports/eddie/scratch/s2247837/vocos-mel-24khz}
+NUM_WORKERS=${NUM_WORKERS:-1}
 
 echo "accent=$ACCENT_NAME  data=$METADATA_CSV"
 echo "F5_ROOT=$F5_ROOT  CKPT_ROOT=$CKPT_ROOT"
@@ -63,4 +70,8 @@ bash "$ACCENT_DIR/scripts/record_provenance.sh" "$ACCENT_DIR" "$F5_ROOT" "$CKPT_
 
 # builds data/<accent>_pinyin (prepare) if needed, then LoRA fine-tunes.
 # Extra args are forwarded to finetune_cli.py as Hydra overrides.
-bash "$ACCENT_DIR/scripts/finetune_lora.sh" ckpts.logger="$LOGGER"
+bash "$ACCENT_DIR/scripts/finetune_lora.sh" \
+    ckpts.logger="$LOGGER" \
+    datasets.num_workers="$NUM_WORKERS" \
+    model.vocoder.is_local=True \
+    model.vocoder.local_path="$VOCODER_DIR"
