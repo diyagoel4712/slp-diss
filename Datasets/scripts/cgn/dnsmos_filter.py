@@ -18,6 +18,8 @@ import csv
 import sys
 from pathlib import Path
 
+from tqdm import tqdm
+
 
 def load_dnsmos():
     try:
@@ -71,7 +73,8 @@ def main():
     n_drop = 0
     with open(clips / "dnsmos_scores.tsv", "w", encoding="utf-8") as sf:
         sf.write("audio_file\t" + "\t".join(metrics) + "\n")
-        for i, (rel, text) in enumerate(rows, 1):
+        bar = tqdm(rows, desc=f"DNSMOS {args.metric}>= {args.min}", unit="clip")
+        for rel, text in bar:
             wav = clips / rel
             try:
                 # pass the path: speechmos reads + resamples to 16 kHz internally
@@ -86,8 +89,7 @@ def main():
                 kept.append((rel, text))
             else:
                 n_drop += 1
-            if i % 500 == 0:
-                print(f"  {i}/{len(rows)} scored, {n_drop} dropped so far", file=sys.stderr)
+            bar.set_postfix(kept=len(kept), dropped=n_drop)
 
     with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f, delimiter="|")
