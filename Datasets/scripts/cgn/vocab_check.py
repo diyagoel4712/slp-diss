@@ -24,6 +24,8 @@ PRETRAINED_VOCAB_PATH = files("f5_tts").joinpath("../../data/vocab.txt")
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--metadata", required=True, help="audio_file|text CSV")
+    ap.add_argument("--vocab", default=str(PRETRAINED_VOCAB_PATH),
+                    help="pretrained vocab.txt (default: the path prepare uses)")
     args = ap.parse_args()
 
     texts = []
@@ -44,7 +46,7 @@ def main():
     for conv_text in conv:                        # conv_text is a list of tokens
         char_freq.update(conv_text)
 
-    vocab = set(files_read(PRETRAINED_VOCAB_PATH))
+    vocab = set(files_read(args.vocab))
 
     missing = {c: n for c, n in char_freq.items() if c not in vocab}
     total = sum(char_freq.values())
