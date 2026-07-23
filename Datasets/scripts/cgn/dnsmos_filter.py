@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+"""Quality-filter a metadata.csv by DNSMOS, matching Accent Vector paper Section 4.2:
+"selecting only utterances with a DNSMOS score higher than 3.4".
+
+Scores each clip listed in <clips>/metadata.csv and writes a filtered CSV
+(metadata.dnsmos.csv) plus a per-clip score table. Point the fork's `prepare`
+stage at the filtered CSV afterwards. Re-runnable with a different --min without
+re-cutting audio.
+
+    python dnsmos_filter.py --clips /exports/.../cgn_dutch_clips --min 3.4
+
+Needs DNSMOS:  pip install speechmos
+DNSMOS operates at 16 kHz (our clips are already 16 kHz).
+"""
+
+import argparse
+import csv
+import sys
+from pathlib import Path
+
+
+def load_dnsmos():
+    try:
+        from speechmos import dnsmos
+    except ImportError:
+        sys.exit("DNSMOS backend missing -- install it in this env:  pip install speechmos")
+    return dnsmos
+
+
+def score_metric(result, metric):
+    """Pull one MOS out of the DNSMOS result dict, tolerant to key casing across
+    speechmos versions (e.g. 'ovrl_mos' vs 'OVRL')."""
+    wanted = {
+        "ovrl": ("ovrl_mos", "OVRL", "ovrl", "OVRL_MOS"),
+        "sig":  ("sig_mos", "SIG", "sig", "SIG_MOS"),
+        "bak":  ("bak_mos", "BAK", "bak", "BAK_MOS"),
+        "p808": ("p808_mos", "P808_MOS", "p808"),
+    }[metric]
+    for k in wanted:
+        if k in result:
+            return float(result[k])
+    raise KeyError(f"'{metric}' not in DNSMOS output keys: {list(result)}")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--clips", required=True,
+                    help="dir containing metadata.csv and wavs/ (from prep_cgn_f5.py)")
+    ap.add_argument("--min", type=float, default=3.4,
+                    help="DNSMOS threshold; paper Section 4.2 uses 3.4")
+    ap.add_argument("--metric", choices=("ovrl", "sig", "bak", "p808"), default="ovrl",
+                    help="which DNSMOS score to threshold on (default ovrl, P.835 overall)")
+    ap.add_argument("--out", default=None,
+                    help="filtered CSV path (default <clips>/metadata.dnsmos.csv)")
+    args = ap.parse_args()
+
+    clips = Path(args.clips)
+    src = clips / "metadata.csv"
+    out = Path(args.out) if args.out else clips / "metadata.dnsmos.csv"
+    dnsmos = load_dnsmos()
+
+    with open(src, newline="", encoding="utf-8") as f:
+        r = csv.reader(f, delimiter="|")
+        next(r)                                   # header
+        rows = [row for row in r if len(row) >= 2]
+    print(f"scoring {len(rows)} clips (DNSMOS {args.metric} >= {args.min})", file=sys.stderr)
+
+    kept = []
+    n_drop = 0
+    with open(clips / "dnsmos_scores.tsv", "w", encoding="utf-8") as sf:
+        sf.write(f"audio_file\t{args.metric}\n")
+        for i, (rel, text) in enumerate(rows, 1):
+            wav = clips / rel
+            try:
+                # pass the path: speechmos reads + resamples to 16 kHz internally
+                result = dnsmos.run(str(wav), 16000)
+                mos = score_metric(result, args.metric)
+            except Exception as e:
+                print(f"! scoring failed for {rel}: {e}", file=sys.stderr)
+                n_drop += 1
+                continue
+            sf.write(f"{rel}\t{mos:.3f}\n")
+            if mos >= args.min:
+                kept.append((rel, text))
+            else:
+                n_drop += 1
+            if i % 500 == 0:
+                print(f"  {i}/{len(rows)} scored, {n_drop} dropped so far", file=sys.stderr)
+
+    with open(out, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f, delimiter="|")
+        w.writerow(["audio_file", "text"])
+        w.writerows(kept)
+
+    print(f"\nkept {len(kept)}/{len(rows)} clips; dropped {n_drop}", file=sys.stderr)
+    print(f"  filtered manifest -> {out}", file=sys.stderr)
+    print(f"  per-clip scores   -> {clips/'dnsmos_scores.tsv'}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

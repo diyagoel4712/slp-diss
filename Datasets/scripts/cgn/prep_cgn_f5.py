@@ -6,9 +6,12 @@ Input layout (under --root):
     audio/wav/comp-*/nl/<id>.wav                 16 kHz mono recordings (whole files)
     annot/text/ort/comp-*/nl/<id>.ort.gz         Praat TextGrid, time-aligned orthography
 
-For every non-empty interval in each recording's speaker tier we cut the audio,
-write a clip at its NATIVE 16 kHz rate (F5 resamples to 24 kHz in the dataloader,
-so pre-resampling would only be lossy upsampling), and append a manifest row.
+CGN's ort tier is a manual forced alignment, so its silences are exact pause
+boundaries and its punctuation marks sentence boundaries. We segment each speaker's
+speech at those pause/sentence boundaries into clips within a duration band (the
+Emilia / LibriTTS approach), then cut the audio and write each clip at its NATIVE
+16 kHz rate (F5 resamples to 24 kHz in the dataloader, so pre-resampling would only
+be lossy upsampling).
 
 The output is the "audio_file|text" CSV that this fork's
 ``accent_vector.data_preprocess prepare`` consumes directly (Phase B/C
@@ -85,6 +88,50 @@ def clean_text(t):
     return t
 
 
+# ---------- utterance segmentation ----------
+# Long-form audio -> training utterances, following the Emilia / LibriTTS approach:
+# segment one speaker's speech at PAUSE and SENTENCE boundaries, keeping each clip in
+# a duration band the model trains on. CGN's ort tier is a manual forced alignment, so
+# its silences are exact pause boundaries and its punctuation marks sentence boundaries
+# -- no VAD/ASR needed. We accumulate whole sentences until a clip reaches target_dur,
+# then close it at the next sentence/pause boundary; we never cross a silence longer
+# than max_cross, and never exceed max_dur.
+
+SENT_END = re.compile(r"[.!?]\s*$")                  # sentence-final punctuation
+
+
+def segment_utterances(intervals, min_dur, target_dur, max_dur, max_cross, pause):
+    """intervals: cleaned, non-empty (start, end, text) in time order.
+    Returns (start, end, joined_text) clips segmented at pause/sentence boundaries."""
+    clips, cur = [], None         # cur = [start, end, [texts]]
+    for s, e, t in intervals:
+        if cur is None:
+            cur = [s, e, [t]]
+            continue
+        gap = s - cur[1]                          # silence before this interval
+        dur = cur[1] - cur[0]                     # current clip length so far
+        ends_sentence = bool(SENT_END.search(cur[2][-1]))
+        if (e - cur[0]) > max_dur or gap > max_cross:
+            # adding would overflow, or a real section break -> close here
+            close = True
+        elif dur >= target_dur and (ends_sentence or gap >= pause):
+            # long enough; close at a natural (sentence or pause) boundary
+            close = True
+        else:
+            close = False                         # keep building toward target
+        if close:
+            clips.append(cur)
+            cur = [s, e, [t]]
+        else:
+            cur[1] = e
+            cur[2].append(t)
+    if cur:
+        clips.append(cur)
+    # keep only clips within the training duration band
+    return [(c[0], c[1], " ".join(c[2])) for c in clips
+            if min_dur <= (c[1] - c[0]) <= max_dur]
+
+
 # ---------- main ----------
 
 def main():
@@ -94,7 +141,14 @@ def main():
     ap.add_argument("--out", required=True, help="output dir for wavs/ + metadata.csv")
     ap.add_argument("--min-dur", type=float, default=3.0,
                     help="drop clips shorter than this (s); paper Section 4.2 uses 3.0")
-    ap.add_argument("--max-dur", type=float, default=30.0, help="drop clips longer than this (s)")
+    ap.add_argument("--max-dur", type=float, default=15.0,
+                    help="hard cap on clip length (s)")
+    ap.add_argument("--target-dur", type=float, default=10.0,
+                    help="once a clip reaches this length, close it at the next sentence/pause boundary (s)")
+    ap.add_argument("--max-cross", type=float, default=1.0,
+                    help="never join across a silence longer than this (s); a longer pause forces a cut")
+    ap.add_argument("--pause", type=float, default=0.3,
+                    help="a silence >= this counts as a boundary where a target-length clip may close (s)")
     args = ap.parse_args()
 
     root = Path(args.root)
@@ -123,9 +177,11 @@ def main():
         with gzip.open(ort, "rt", encoding="latin-1") as f:
             tiers = parse_textgrid_short(f.read())
         spk_name = next((n for n in tiers if SPK_TIER.match(n)), "?")
-        utts = [(s, e, clean_text(t)) for (s, e, t) in speaker_intervals(tiers)]
-        utts = [(s, e, t) for (s, e, t) in utts
-                if t and args.min_dur <= (e - s) <= args.max_dur]
+        # cleaned, non-empty intervals in time order -> segment at pause/sentence boundaries
+        clean = [(s, e, ct) for (s, e, t) in speaker_intervals(tiers)
+                 if (ct := clean_text(t))]
+        utts = segment_utterances(clean, args.min_dur, args.target_dur, args.max_dur,
+                                  args.max_cross, args.pause)
         if not utts:
             continue
 
