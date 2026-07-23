@@ -1,18 +1,23 @@
 #!/bin/bash
 # Eddie (SGE) GPU wrapper for scripts/finetune_lora.sh -- LoRA fine-tune one accent.
-#   cd ~/slp-diss/AccentVector && mkdir -p logs
+#   cd /exports/chss/eddie/ppls/groups/slpgpustorage/users/s2247837/slp-diss/AccentVector && mkdir -p logs
 #   qsub scripts/eddie_finetune_lora.sh
 # Override any env var at submit time, e.g.:
 #   qsub -v ACCENT_NAME=dutch scripts/eddie_finetune_lora.sh
+# The job name is static (SGE parses -N before the script runs, so it can't read
+# ACCENT_NAME); override it on the command line to match, e.g.:
+#   qsub -N ft_dutch -v ACCENT_NAME=dutch scripts/eddie_finetune_lora.sh
 #
-#$ -N ft_dutch
+#$ -N ft_accent
 #$ -cwd
 #$ -q gpu
-#$ -pe gpu-a100 1            # <-- VERIFY: GPU parallel-env/queue for your allocation
-#$ -l h_rt=24:00:00         #     (you have slpgpustorage -- check your group's GPU queue)
-#$ -l h_vmem=64G
+#$ -l gpu=1            
+#$ -l h_rt=12:00:00         
+#$ -l h_vmem=32G
 #$ -o logs/ft.$JOB_ID.out
 #$ -e logs/ft.$JOB_ID.err
+#$ -P ppls_slpgpu
+#$ -M s2247837@ed.ac.uk
 
 set -euo pipefail
 
@@ -22,8 +27,11 @@ module load cuda            # <-- match the CUDA your torch build expects
 module load anaconda
 conda activate f5-tts       # your F5-TTS env
 
-# compute nodes have no internet -> keep wandb from hanging
+# compute nodes have no internet. wandb would need a cached API key (else the
+# trainer silently disables logging) and only writes local files to sync later,
+# so default to tensorboard: fully local, no key, event files under runs/lora_<accent>.
 export WANDB_MODE=${WANDB_MODE:-offline}
+LOGGER=${LOGGER:-tensorboard}
 
 ACCENT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 
@@ -42,5 +50,6 @@ echo "accent=$ACCENT_NAME  data=$METADATA_CSV"
 echo "F5_ROOT=$F5_ROOT  CKPT_ROOT=$CKPT_ROOT"
 nvidia-smi -L || true
 
-# builds data/<accent>_pinyin (prepare) if needed, then LoRA fine-tunes
-bash "$ACCENT_DIR/scripts/finetune_lora.sh"
+# builds data/<accent>_pinyin (prepare) if needed, then LoRA fine-tunes.
+# Extra args are forwarded to finetune_cli.py as Hydra overrides.
+bash "$ACCENT_DIR/scripts/finetune_lora.sh" ckpts.logger="$LOGGER"
