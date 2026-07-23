@@ -6,6 +6,7 @@
 #   ACCENT_NAME=british \
 #   METADATA_CSV=/path/to/british.csv AUDIO_ROOT=/path/to/audio \
 #   PRETRAIN=$F5_ROOT/ckpts/F5TTS_v1_Base/model_1250000.pt \
+#   CKPT_ROOT=exps \
 #   bash scripts/finetune_lora.sh
 #
 # Stop cleanly when the samples sound right:  touch <save_dir>/STOP
@@ -13,10 +14,11 @@
 #
 # Checkpoints (model_last.pt, pretrained_<name> copy, snapshots/lora_<step>.pt --
 # the actual accent vector) are large, regenerable-by-rerunning artifacts, so they
-# go under CKPT_ROOT (default: same as before, AccentVector/exps -- override to
-# scratch on the HPC, e.g. CKPT_ROOT=/exports/eddie/scratch/$USER/accentvector-exps).
-# Everything persistent (results/, vectors/, transcripts/, data/, code) is untouched
-# by this and stays under AccentVector/ as always.
+# go under CKPT_ROOT, which is REQUIRED (no default) so its location is always an
+# explicit choice: AccentVector/exps locally, or scratch on the HPC
+# (CKPT_ROOT=/exports/eddie/scratch/$USER/accentvector-exps -- the eddie wrapper
+# sets this for you). Everything persistent (results/, vectors/, transcripts/,
+# data/, code) is untouched by this and stays under AccentVector/ as always.
 set -euo pipefail
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
@@ -25,7 +27,7 @@ ACCENT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}
 export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR:${PYTHONPATH:-}"
 
-CKPT_ROOT=${CKPT_ROOT:-"$ACCENT_DIR/exps"}
+CKPT_ROOT=${CKPT_ROOT:?set CKPT_ROOT (e.g. exps locally, or scratch on the HPC -- the eddie wrapper sets it)}
 
 ACCENT_NAME=${ACCENT_NAME:?set ACCENT_NAME (e.g. british)}
 PRETRAIN=${PRETRAIN:-"$F5_ROOT/ckpts/F5TTS_v1_Base/model_1250000.pt"}

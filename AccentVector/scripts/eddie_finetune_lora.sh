@@ -22,8 +22,9 @@
 set -euo pipefail
 
 # --- environment (adjust module names to your Eddie setup) ---
+# No `module load cuda`: the f5-tts torch wheel bundles its own CUDA runtime and
+# uses the node's driver directly. Loading a system CUDA can shadow those libs.
 . /etc/profile.d/modules.sh
-module load cuda            # <-- match the CUDA your torch build expects
 module load anaconda
 conda activate f5-tts       # your F5-TTS env
 
@@ -31,9 +32,12 @@ conda activate f5-tts       # your F5-TTS env
 # trainer silently disables logging) and only writes local files to sync later,
 # so default to tensorboard: fully local, no key, event files under runs/lora_<accent>.
 export WANDB_MODE=${WANDB_MODE:-offline}
-LOGGER=${LOGGER:-tensorboard}
+export LOGGER=${LOGGER:-tensorboard}
 
-ACCENT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+# SGE runs a spooled COPY of this script, so $0 is not the scripts/ path. With
+# -cwd the submission dir (AccentVector) is SGE_O_WORKDIR; fall back to $PWD when
+# run outside SGE (e.g. testing locally from AccentVector/).
+ACCENT_DIR="${SGE_O_WORKDIR:-$PWD}"
 
 # --- run config (all overridable via `qsub -v KEY=VAL,...`) ---
 export F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}          # confirm F5-TTS location
@@ -49,6 +53,13 @@ export F5_VOCAB=${F5_VOCAB:-"$F5_ROOT/examples/vocab.txt"}
 echo "accent=$ACCENT_NAME  data=$METADATA_CSV"
 echo "F5_ROOT=$F5_ROOT  CKPT_ROOT=$CKPT_ROOT"
 nvidia-smi -L || true
+# confirm torch sees its bundled CUDA + the GPU (no system CUDA module needed)
+python -c "import torch; print('torch', torch.__version__, 'cuda', torch.version.cuda, 'avail', torch.cuda.is_available())"
+
+# record run provenance (code versions + config) -> log + CKPT_ROOT/provenance/.
+# Best-effort: a provenance hiccup must never kill the GPU job.
+bash "$ACCENT_DIR/scripts/record_provenance.sh" "$ACCENT_DIR" "$F5_ROOT" "$CKPT_ROOT/provenance" \
+    || echo "warning: provenance capture failed (continuing)"
 
 # builds data/<accent>_pinyin (prepare) if needed, then LoRA fine-tunes.
 # Extra args are forwarded to finetune_cli.py as Hydra overrides.
