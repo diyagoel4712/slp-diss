@@ -13,7 +13,7 @@
 #$ -q gpu
 #$ -l gpu=1            
 #$ -l h_rt=12:00:00         
-#$ -l h_vmem=64G           # VIRTUAL mem ceiling; CUDA reserves huge vmem (real RSS ~5G), so keep this generous
+#$ -l h_vmem=96G           # VIRTUAL mem ceiling; CUDA reserves ~50G vmem/process (real RSS <10G). Keep generous.
 #$ -o logs/ft.$JOB_ID.out
 #$ -e logs/ft.$JOB_ID.err
 #$ -P ppls_slpgpu
@@ -53,10 +53,11 @@ export LORA_LABEL=${LORA_LABEL:-0}
 # base vocab, without staging a file into the F5-TTS tree (prepare reads F5_VOCAB)
 export F5_VOCAB=${F5_VOCAB:-"$F5_ROOT/examples/vocab.txt"}
 # vocoder for log_samples: pre-downloaded to scratch so the offline node uses it
-# locally (dir must hold config.yaml + pytorch_model.bin). NUM_WORKERS defaults to
-# 1 -- the gpu=1 allocation grants 1 CPU core, so more workers just oversubscribe.
+# locally (dir must hold config.yaml + pytorch_model.bin). NUM_WORKERS=0 loads data
+# in the main process: the node has 1 CPU core anyway, and any forked worker inherits
+# CUDA's ~50G VIRTUAL reservation, which SGE sums into h_vmem -> OOM-kill (exit 137).
 VOCODER_DIR=${VOCODER_DIR:-/exports/eddie/scratch/s2247837/vocos-mel-24khz}
-NUM_WORKERS=${NUM_WORKERS:-1}
+NUM_WORKERS=${NUM_WORKERS:-0}
 
 echo "accent=$ACCENT_NAME  data=$METADATA_CSV"
 echo "F5_ROOT=$F5_ROOT  CKPT_ROOT=$CKPT_ROOT"
