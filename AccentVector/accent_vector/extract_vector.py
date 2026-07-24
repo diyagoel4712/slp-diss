@@ -138,6 +138,66 @@ def extract(pretrained_path, finetuned_path, out_path, verbose=True):
     return out_path
 
 
+# --- LoRA recovery: pull tau straight out of a full checkpoint --------------
+def _is_lora_key(key):
+    """A flat state-dict key belongs to the LoRA branch iff some path component
+    is a ``lora_*`` submodule (lora_q, lora_conv1, lora_linear, ...). LoRALinear
+    stores only its low-rank ``encoders``/``decoders`` there -- no frozen base
+    copy -- so these keys are exactly the trainable accent vector tau (Eq. 3)."""
+    return any(part.startswith("lora_") for part in key.split("."))
+
+
+def extract_lora(checkpoint_path, out_path, source="model", verbose=True):
+    """Recover the LoRA accent vector from a FULL training checkpoint
+    (model_last.pt / model_<step>.pt) when no ``lora_<step>.pt`` snapshot exists.
+
+    The unmerged-LoRA fine-tune leaves the base weights frozen and puts tau in
+    new ``lora_*`` keys, so the diff-based ``extract`` yields an empty vector.
+    Here we instead slice those keys directly, reproducing byte-for-byte what
+    ``Trainer.save_lora_snapshot`` would have written -- a dict consumable by
+    ``lora_model.load_lora_state`` / ``infer_accent --lora``.
+
+    ``source`` picks which weights to read: ``"model"`` (the raw trained model,
+    matching what save_lora_snapshot captured) or ``"ema"`` (the EMA-smoothed
+    copy, often preferred for a final deliverable vector).
+    """
+    ckpt = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    if not isinstance(ckpt, dict):
+        raise RuntimeError(f"unexpected checkpoint layout in {checkpoint_path}: not a dict")
+
+    if source == "ema":
+        sd = ckpt.get("ema_model_state_dict")
+        if sd is None:
+            raise RuntimeError(f"no ema_model_state_dict in {checkpoint_path}")
+        # ema_pytorch prefixes the tracked weights with 'ema_model.'; drop its
+        # bookkeeping (initted/step) and the shadowed 'online_model.' copy.
+        sd = {k[len("ema_model."):]: v for k, v in sd.items() if k.startswith("ema_model.")}
+    elif source == "model":
+        sd = ckpt.get("model_state_dict")
+        if sd is None:
+            raise RuntimeError(f"no model_state_dict in {checkpoint_path}")
+    else:
+        raise ValueError(f"source must be 'model' or 'ema', got {source!r}")
+
+    lora_state = {k: v.detach().cpu() for k, v in sd.items()
+                  if isinstance(v, torch.Tensor) and _is_lora_key(k)}
+    if not lora_state:
+        raise RuntimeError(
+            f"no lora_* tensors found in {source} weights of {checkpoint_path}; "
+            "is this an unmerged-LoRA checkpoint?"
+        )
+
+    update = ckpt.get("update")
+    if verbose:
+        n_params = sum(t.numel() for t in lora_state.values())
+        print(f"[extract-lora] {len(lora_state)} LoRA tensors ({n_params:,} params) "
+              f"from {source} weights, update={update}")
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    torch.save({"lora_state_dict": lora_state, "update": update}, out_path)
+    print(f"[extract-lora] saved LoRA accent vector -> {out_path}")
+    return out_path
+
+
 # --- Eq. 4-6: build an accent-modified model --------------------------------
 def _key_selected(key, include, exclude):
     """Layer masking: keep ``key`` iff it matches an include substring (when the
@@ -199,6 +259,16 @@ def _build_parser():
     p_ex.add_argument("--finetuned", required=True, help="fine-tuned checkpoint (theta_ft)")
     p_ex.add_argument("--out", required=True, help="output path for the accent vector")
 
+    p_el = sub.add_parser(
+        "extract-lora",
+        help="recover the LoRA vector (lora_state_dict) from a full checkpoint when no snapshot exists",
+    )
+    p_el.add_argument("--checkpoint", required=True,
+                      help="full training checkpoint (e.g. model_last.pt) holding the lora_* keys")
+    p_el.add_argument("--out", required=True, help="output path for the LoRA accent vector")
+    p_el.add_argument("--source", choices=("model", "ema"), default="model",
+                      help="which weights to slice: 'model' (raw, = save_lora_snapshot) or 'ema'")
+
     p_co = sub.add_parser("compose", help="theta_pre + sum a_i * tau_i (Eq. 4-6)")
     p_co.add_argument("--pretrained", required=True, help="base F5 checkpoint (theta_pre)")
     p_co.add_argument(
@@ -221,6 +291,8 @@ def main():
     args = _build_parser().parse_args()
     if args.command == "extract":
         extract(args.pretrained, args.finetuned, args.out)
+    elif args.command == "extract-lora":
+        extract_lora(args.checkpoint, args.out, source=args.source)
     elif args.command == "compose":
         if len(args.vector) != len(args.alpha):
             raise SystemExit(
