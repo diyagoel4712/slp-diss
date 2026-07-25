@@ -23,7 +23,7 @@ export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR:${PYTHONPATH:-}"
 ACCENT_NAME=${ACCENT_NAME:-british}
 PRETRAIN=${PRETRAIN:-"$F5_ROOT/ckpts/F5TTS_v1_Base/model_1250000.pt"}
 VECTOR=${VECTOR:-"$ACCENT_DIR/vectors/${ACCENT_NAME}.pt"}
-ALPHAS=${ALPHAS:-"0,0.2,0.4,0.6,0.8,1.0"}
+ALPHAS=${ALPHAS:-"0,0.25,0.5,0.75,1.0"}
 # native-language (L1) reference for this accent; REF_TEXT must be its transcript
 REF_AUDIO=${REF_AUDIO:-"$ACCENT_DIR/refs/england.wav"}
 REF_TEXT=${REF_TEXT:-"Some call me nature, others call me mother nature."}

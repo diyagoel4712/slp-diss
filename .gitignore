@@ -248,8 +248,6 @@ Expressive-Vectors/
 
 # Generated audio outputs
 outputs/
-*.wav
-*.flac
 
 # Generated evaluation artifacts (reproducible via Evaluation/run_pipeline.sh)
 Evaluation/evaluation_results.csv
