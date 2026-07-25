@@ -4,6 +4,8 @@ exps/
 vectors/
 results/
 wandb/
+runs/
+logs/
 refs/
 *.pt
 __pycache__/
