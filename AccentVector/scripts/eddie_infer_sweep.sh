@@ -46,6 +46,10 @@ export VOCAB=${VOCAB:-"$RUN_DIR/vocab.txt"}
 export VECTOR=${VECTOR:-"$ACCENT_DIR/vectors/${ACCENT_NAME}.pt"}
 export PRETRAIN=${PRETRAIN:-/exports/eddie/scratch/s2247837/ckpts/F5TTS_v1_Base/model_1250000.safetensors}
 export ALPHAS=${ALPHAS:-"0,0.2,0.4,0.6,0.8,1.0"}
+# qsub -v uses commas to separate variables, so a comma-separated ALPHAS value collapses
+# to its first element (ALPHAS="0,0.25,..." -> ALPHAS=0). Pass ALPHAS space-separated on
+# the qsub line (e.g. ALPHAS="0 0.25 0.5 0.75 1.0") and normalise spaces to commas here.
+export ALPHAS="${ALPHAS// /,}"
 # native-language (L1) reference for this accent + its (Dutch) transcript. REQUIRED to
 # match the clip exactly -- no sensible default, so fail loudly if unset.
 export REF_AUDIO=${REF_AUDIO:?set REF_AUDIO=refs/<accent>_l1.wav (the fixed L1 reference clip)}
