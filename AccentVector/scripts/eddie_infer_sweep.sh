@@ -49,7 +49,16 @@ export ALPHAS=${ALPHAS:-"0,0.2,0.4,0.6,0.8,1.0"}
 # native-language (L1) reference for this accent + its (Dutch) transcript. REQUIRED to
 # match the clip exactly -- no sensible default, so fail loudly if unset.
 export REF_AUDIO=${REF_AUDIO:?set REF_AUDIO=refs/<accent>_l1.wav (the fixed L1 reference clip)}
-export REF_TEXT=${REF_TEXT:?set REF_TEXT to the exact transcript of REF_AUDIO}
+export REF_TEXT=${REF_TEXT:?set REF_TEXT to the exact transcript of REF_AUDIO (or a path to a file holding it)}
+# REF_TEXT may be either the literal transcript or a path to a file containing it
+# (handy for long L1 references -- avoids retyping/mis-quoting in the qsub -v line).
+# Resolve relative paths against the submission dir, mirroring the other inputs.
+if [ -f "$REF_TEXT" ]; then
+    REF_TEXT="$(cat "$REF_TEXT")"
+elif [ -f "$ACCENT_DIR/$REF_TEXT" ]; then
+    REF_TEXT="$(cat "$ACCENT_DIR/$REF_TEXT")"
+fi
+export REF_TEXT
 export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}"}
 # LoRA is the paper-matching default in infer_sweep.sh; set LORA=0 for a merged sweep.
 export LORA=${LORA:-1}
