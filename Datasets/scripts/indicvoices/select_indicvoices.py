@@ -137,15 +137,16 @@ def expand(patterns):
 
 # ---------- clip loading + gating ----------
 
-def load_clips(manifests, lang, min_dur, max_dur, min_snr, min_c50):
-    """Return (clips, stats). clips: list of dicts with id/spk/gender/dur/scenario.
-    Applies the language + duration + optional quality gates; scenario tiering is
-    applied later in build_pool so both tiers share one scan."""
+def gate_clips(rows, lang, min_dur, max_dur, min_snr, min_c50):
+    """Return (clips, stats) from an iterable of row dicts (JSONL- or parquet-derived).
+    clips: list of dicts with id/spk/gender/dur/scenario. Applies the language +
+    duration + optional quality gates; scenario tiering is applied later in build_pool
+    so both tiers share one scan."""
     clips = []
     stats = {"rows": 0, "no_id": 0, "wrong_lang": 0, "bad_dur": 0,
              "no_gender": 0, "low_qual": 0, "scenario": defaultdict(int),
              "gender": defaultdict(int)}
-    for row in iter_manifest(manifests):
+    for row in rows:
         stats["rows"] += 1
         if lang and (row.get(F_LANG) or "").strip().lower() not in ("", lang.lower()):
             stats["wrong_lang"] += 1
@@ -186,6 +187,11 @@ def load_clips(manifests, lang, min_dur, max_dur, min_snr, min_c50):
         clips.append({"id": cid, "spk": (row.get(F_SPK) or "").strip(),
                       "gender": g, "dur": dur, "scenario": scen})
     return clips, stats
+
+
+def load_clips(manifests, lang, min_dur, max_dur, min_snr, min_c50):
+    """gate_clips over rows read from JSONL/JSON/dir manifests."""
+    return gate_clips(iter_manifest(manifests), lang, min_dur, max_dur, min_snr, min_c50)
 
 
 def build_pool(clips, read_tok, ext_tok, conv_tok, include_conv):
@@ -234,6 +240,50 @@ def select_balanced(pool, target_sec, order):
     return chosen_ids, chosen_spk, totals
 
 
+# ---------- shared driver (reused by the parquet ingest) ----------
+
+def print_scan_stats(clips, stats, has_qual):
+    print(f"[scan] {stats['rows']} rows -> {len(clips)} clips pass lang/dur/gender"
+          f"{'/quality' if has_qual else ''} gates", file=sys.stderr)
+    print(f"       dropped: wrong_lang={stats['wrong_lang']} bad_dur={stats['bad_dur']} "
+          f"no_gender={stats['no_gender']} no_id={stats['no_id']} low_qual={stats['low_qual']}",
+          file=sys.stderr)
+    print("       scenario distribution (post-gate, by clip count):", file=sys.stderr)
+    for s, n in sorted(stats["scenario"].items(), key=lambda x: -x[1]):
+        print(f"         {s:<24} {n}", file=sys.stderr)
+    print(f"       gender: {dict(stats['gender'])}", file=sys.stderr)
+
+
+def run_selection(clips, hours, order, read_tok, ext_tok, conv_tok, no_conv_fallback):
+    """Scenario tiering (read+extempore, then +conversational if short) + balanced
+    greedy select. Returns (chosen_ids, chosen_spk, totals). Prints tier/warn lines."""
+    pool = build_pool(clips, read_tok, ext_tok, conv_tok, include_conv=False)
+    print(f"[tier1] read+extempore pool: {len(pool)} speakers ({pool_hours(pool):.1f} h)",
+          file=sys.stderr)
+    if pool_hours(pool) < hours and not no_conv_fallback:
+        pool = build_pool(clips, read_tok, ext_tok, conv_tok, include_conv=True)
+        print(f"[tier2] +conversational:    {len(pool)} speakers ({pool_hours(pool):.1f} h)"
+              "  (read+extempore alone was below target)", file=sys.stderr)
+    if pool_hours(pool) < hours:
+        print(f"! WARNING: eligible pool is only {pool_hours(pool):.1f} h "
+              f"(< {hours} h target); selecting everything available.", file=sys.stderr)
+    return select_balanced(pool, hours * 3600.0, order)
+
+
+def print_selection_summary(chosen_ids, chosen_spk, totals):
+    hm, hf = totals["male"] / 3600.0, totals["female"] / 3600.0
+    print("\n=== selection ===")
+    print(f"clips    : {len(chosen_ids)}")
+    print(f"speakers : {len(chosen_spk)}")
+    print(f"hours    : {hm + hf:.1f}  (male={hm:.1f} h, female={hf:.1f} h)")
+    if hm + hf:
+        print(f"gender balance: male {100*hm/(hm+hf):.0f}% / female {100*hf/(hm+hf):.0f}%")
+
+
+def toks(s):
+    return tuple(t for t in s.split(",") if t)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -261,45 +311,16 @@ def main():
                     help="output file of selected clip ids (filename/chunk_name)")
     args = ap.parse_args()
 
-    read_tok = tuple(t for t in args.read_tokens.split(",") if t)
-    ext_tok = tuple(t for t in args.extempore_tokens.split(",") if t)
-    conv_tok = tuple(t for t in args.conv_tokens.split(",") if t)
-    target_sec = args.hours * 3600.0
-
     manifests = expand(args.manifest)
     clips, stats = load_clips(manifests, args.lang, args.min_dur, args.max_dur,
                               args.min_snr, args.min_c50)
-    print(f"[scan] {stats['rows']} rows -> {len(clips)} clips pass lang/dur/gender"
-          f"{'/quality' if (args.min_snr or args.min_c50) else ''} gates", file=sys.stderr)
-    print(f"       dropped: wrong_lang={stats['wrong_lang']} bad_dur={stats['bad_dur']} "
-          f"no_gender={stats['no_gender']} no_id={stats['no_id']} low_qual={stats['low_qual']}",
-          file=sys.stderr)
-    print("       scenario distribution (post-gate, by clip count):", file=sys.stderr)
-    for s, n in sorted(stats["scenario"].items(), key=lambda x: -x[1]):
-        print(f"         {s:<24} {n}", file=sys.stderr)
-    print(f"       gender: {dict(stats['gender'])}", file=sys.stderr)
+    print_scan_stats(clips, stats, has_qual=bool(args.min_snr or args.min_c50))
 
-    # scenario tiering: try read+extempore, extend to conversational if short
-    pool = build_pool(clips, read_tok, ext_tok, conv_tok, include_conv=False)
-    print(f"[tier1] read+extempore pool: {len(pool)} speakers ({pool_hours(pool):.1f} h)",
-          file=sys.stderr)
-    if pool_hours(pool) < args.hours and not args.no_conv_fallback:
-        pool = build_pool(clips, read_tok, ext_tok, conv_tok, include_conv=True)
-        print(f"[tier2] +conversational:    {len(pool)} speakers ({pool_hours(pool):.1f} h)"
-              "  (read+extempore alone was below target)", file=sys.stderr)
-
-    if pool_hours(pool) < args.hours:
-        print(f"! WARNING: eligible pool is only {pool_hours(pool):.1f} h "
-              f"(< {args.hours} h target); selecting everything available.", file=sys.stderr)
-
-    chosen_ids, chosen_spk, totals = select_balanced(pool, target_sec, args.order)
-    hm, hf = totals["male"] / 3600.0, totals["female"] / 3600.0
-    print("\n=== selection ===")
-    print(f"clips    : {len(chosen_ids)}")
-    print(f"speakers : {len(chosen_spk)}")
-    print(f"hours    : {hm + hf:.1f}  (male={hm:.1f} h, female={hf:.1f} h)")
-    if hm + hf:
-        print(f"gender balance: male {100*hm/(hm+hf):.0f}% / female {100*hf/(hm+hf):.0f}%")
+    chosen_ids, chosen_spk, totals = run_selection(
+        clips, args.hours, args.order,
+        toks(args.read_tokens), toks(args.extempore_tokens), toks(args.conv_tokens),
+        args.no_conv_fallback)
+    print_selection_summary(chosen_ids, chosen_spk, totals)
 
     with open(args.out, "w", encoding="utf-8") as f:
         for cid in sorted(set(chosen_ids)):

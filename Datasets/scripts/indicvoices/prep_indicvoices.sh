@@ -22,16 +22,14 @@ source activate f5-tts          # <-- your F5-TTS conda env (needs torchaudio, s
                                 #     and the romaniser: ai4bharat-transliteration)
 
 SCRATCH=/exports/eddie/scratch/s2247837/data
-# IndicVoices-R tarballs are named by language (Hindi.tar.gz -> Hindi/). Map the ISO
-# IVLANG to that folder; override SRC=... on the qsub line if your layout differs.
+# IndicVoices-R on HuggingFace is per-language parquet folders (Hindi/, Bengali/) with
+# audio embedded. Map the ISO IVLANG to that folder; override SRC=... if layout differs.
 case "$IVLANG" in
   hi) LANGDIR=Hindi ;;
   bn) LANGDIR=Bengali ;;
   *)  LANGDIR=$IVLANG ;;
 esac
-SRC=${SRC:-$SCRATCH/indicvoices_r/$LANGDIR}   # extracted IndicVoices-R for this language
-MANIFEST=${MANIFEST:-$SRC}               # dir: loader picks up *.json / *.jsonl recursively
-AUDIO_ROOT=${AUDIO_ROOT:-$SRC}           # root the manifest's filename paths resolve under
+SRC=${SRC:-$SCRATCH/indicvoices_r/$LANGDIR}   # downloaded IndicVoices-R parquet for this language
 
 WORK=$SCRATCH/iv_${IVLANG}                 # selection + clips live here
 CLIPS=$WORK/clips                        # wavs/ + metadata.csv
@@ -42,17 +40,13 @@ CGN=Datasets/scripts/cgn                 # reuse the format-generic dnsmos/vocab
 IV=Datasets/scripts/indicvoices
 mkdir -p "$WORK"
 
-# 1. balanced ~HOURS selection (read+extempore, auto-add conversational if short)
-python $IV/select_indicvoices.py \
-    --manifest "$MANIFEST" --lang "$IVLANG" --hours "$HOURS" \
-    --out "$WORK/selected_clips.txt"
-
-# 2. downmix selected clips to mono + write metadata.csv (NATIVE script text).
-#    Keeps native 48 kHz; F5's dataloader resamples to 24k at load time. Add --sr 24000
-#    to pre-resample and halve on-disk size.
-python $IV/prep_indicvoices_f5.py \
-    --manifest "$MANIFEST" --selected "$WORK/selected_clips.txt" \
-    --audio-root "$AUDIO_ROOT" --out "$CLIPS"
+# 1+2. balanced ~HOURS selection from read+extempore only (--no-conv-fallback: never
+#    admit conversational) + decode only the selected clips' embedded audio -> wavs/ +
+#    metadata.csv (NATIVE script text). Keeps native 48 kHz; F5's dataloader resamples
+#    to 24k at load time (add --sr 24000 to pre-resample and halve on-disk size).
+python $IV/prep_from_parquet.py \
+    --parquet-dir "$SRC" --lang "$IVLANG" --hours "$HOURS" --out "$CLIPS" \
+    --no-conv-fallback
 
 # 3. DNSMOS quality filter (p808 >= 3.4) -> metadata.dnsmos.csv (audio-only; text unchanged)
 python $CGN/dnsmos_filter.py --clips "$CLIPS" --min 3.4 --metric p808
