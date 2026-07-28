@@ -20,24 +20,43 @@ from collections import Counter
 from pathlib import Path
 
 
+def _iter_file(p):
+    """Yield rows from one manifest file: .jsonl (streamed), .json array, or a single
+    .json object; extension-less files are sniffed with a jsonl fallback."""
+    p = Path(p)
+    if p.suffix.lower() == ".jsonl":
+        with open(p, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    yield json.loads(line)
+        return
+    with open(p, encoding="utf-8") as f:
+        if f.read(2048).lstrip().startswith("["):
+            f.seek(0)
+            yield from json.load(f)
+            return
+        f.seek(0)
+        try:
+            obj = json.load(f)
+        except json.JSONDecodeError:
+            f.seek(0)
+            for line in f:
+                line = line.strip()
+                if line:
+                    yield json.loads(line)
+            return
+    yield from (obj if isinstance(obj, list) else [obj])
+
+
 def iter_manifest(paths):
     for p in paths:
         p = Path(p)
         if p.is_dir():
-            for jf in sorted(p.rglob("*.json")):
-                with open(jf, encoding="utf-8") as f:
-                    yield json.load(f)
-            continue
-        with open(p, encoding="utf-8") as f:
-            head = f.read(1); f.seek(0)
-            if head == "[":
-                for row in json.load(f):
-                    yield row
-            else:
-                for line in f:
-                    line = line.strip()
-                    if line:
-                        yield json.loads(line)
+            for jf in sorted(list(p.rglob("*.jsonl")) + list(p.rglob("*.json"))):
+                yield from _iter_file(jf)
+        else:
+            yield from _iter_file(p)
 
 
 def expand(patterns):
