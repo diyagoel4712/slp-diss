@@ -41,8 +41,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import select_indicvoices as sel   # noqa: E402
 
 TEXT_CANDIDATES = ("normalized", "verbatim", "text")
-ID_CANDIDATES = ("filename", "chunk_name")
 AUDIO_NAME_HINTS = ("audio", "wav", "speech")
+
+
+def synth_id(shard_path, idx):
+    """The HF release has no filename/chunk_name column, so identify a clip by its
+    (shard, row-position). Deterministic across passes as long as both iterate the
+    same shards in the same order (parquet preserves row order)."""
+    return f"{Path(shard_path).stem}_{idx:06d}"
 
 
 def shard_paths(patterns):
@@ -106,12 +112,16 @@ def resample(arr, sr, out_sr):
 
 
 def meta_rows(shards, audio_col):
-    """Yield metadata dicts (audio column skipped) across all shards -- pass A."""
+    """Yield metadata dicts (audio column skipped) across all shards -- pass A. Injects
+    a synthetic 'filename' (shard+position) so sel.clip_id/gating have a stable id."""
     for f in shards:
         cols = [n for n in pq.read_schema(f).names if n != audio_col]
         t = pq.read_table(f, columns=cols)
+        idx = 0
         for batch in t.to_batches():
             for row in batch.to_pylist():
+                row["filename"] = synth_id(f, idx)
+                idx += 1
                 yield row
 
 
@@ -124,7 +134,7 @@ def inspect(shards):
     print("schema:")
     for fld in schema:
         print(f"  {fld.name:<22} {fld.type}")
-    print(f"\ndetected -> id={pick(names, ID_CANDIDATES)}  "
+    print(f"\ndetected -> id=<synthesized: shard+row-position (no filename column)>  "
           f"text={pick(names, TEXT_CANDIDATES)}  audio={audio_col}")
     t = pq.read_table(f, columns=[n for n in names if n != audio_col])
     row0 = t.slice(0, 1).to_pylist()[0]
@@ -176,12 +186,11 @@ def main():
     schema = pq.read_schema(shards[0])
     names = list(schema.names)
     audio_col = detect_audio_col(schema)
-    id_col = pick(names, ID_CANDIDATES)
     text_col = args.text_field or pick(names, TEXT_CANDIDATES)
-    if not (audio_col and id_col and text_col):
-        sys.exit(f"could not detect columns (id={id_col} text={text_col} audio={audio_col}); "
-                 f"run --inspect and pass --text-field / rename knobs")
-    print(f"columns -> id={id_col} text={text_col} audio={audio_col}", file=sys.stderr)
+    if not (audio_col and text_col):
+        sys.exit(f"could not detect columns (text={text_col} audio={audio_col}); "
+                 f"run --inspect and pass --text-field / check the audio column")
+    print(f"columns -> id=<synthesized> text={text_col} audio={audio_col}", file=sys.stderr)
 
     # ---- pass A: metadata -> gate + balanced selection ----
     clips, stats = sel.gate_clips(meta_rows(shards, audio_col), args.lang,
@@ -198,8 +207,8 @@ def main():
     out = Path(args.out)
     (out / "wavs").mkdir(parents=True, exist_ok=True)
     keep_cols = [c for c in dict.fromkeys(
-        list(ID_CANDIDATES) + [text_col, audio_col, sel.F_SPK, sel.F_GENDER,
-                               sel.F_SCENARIO, sel.F_TASK, sel.F_DUR]) if c in names]
+        [text_col, audio_col, sel.F_SPK, sel.F_GENDER,
+         sel.F_SCENARIO, sel.F_TASK, sel.F_DUR]) if c in names]
 
     meta_f = open(out / "metadata.csv", "w", newline="", encoding="utf-8")
     meta = csv.writer(meta_f, delimiter="|")
@@ -209,10 +218,12 @@ def main():
 
     n_clip, total_sec, n_bad, seen = 0, 0.0, 0, set()
     for f in shards:
-        t = pq.read_table(f, columns=[c for c in keep_cols])
-        for row in t.to_batches():
-            for r in row.to_pylist():
-                cid = sel.clip_id(r)
+        t = pq.read_table(f, columns=keep_cols)
+        idx = -1                       # per-shard row position, matching meta_rows
+        for batch in t.to_batches():
+            for r in batch.to_pylist():
+                idx += 1
+                cid = synth_id(f, idx)
                 if cid not in wanted or cid in seen:
                     continue
                 seen.add(cid)
