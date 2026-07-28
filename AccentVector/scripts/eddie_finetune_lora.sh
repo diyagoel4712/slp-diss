@@ -12,7 +12,7 @@
 #$ -cwd
 #$ -q gpu
 #$ -l gpu=1            
-#$ -l h_rt=12:00:00         
+#$ -l h_rt=24:00:00         
 #$ -l h_vmem=96G           # VIRTUAL mem ceiling; CUDA reserves ~50G vmem/process (real RSS <10G). Keep generous.
 #$ -o logs/ft.$JOB_ID.out
 #$ -e logs/ft.$JOB_ID.err
