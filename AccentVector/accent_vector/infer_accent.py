@@ -2,12 +2,24 @@
 
 For each strength coefficient alpha, we build theta_pre + alpha * tau_accent and
 synthesize a fixed set of English transcripts (input text to be synthesised). The
-reference clip is the target accent's **native-language (L1) reference**, held fixed
-per accent across the sweep, so the accent vector is the only thing that varies
-within a sweep (paper-faithful cloning; see ADAPTATION_PLAN.md gotcha #3). The sweep
-runs between two exact anchors: **alpha=0 = theta_pre** (the pretrained model cloning
-the accent from the reference alone, no fine-tuning) and **alpha=1 = theta_ft** (the
-fully fine-tuned model, full accent-vector impact).
+reference clip is held fixed *within* a sweep, so the accent vector is the only thing
+that varies as alpha climbs. The sweep runs between two exact anchors:
+**alpha=0 = theta_pre** (the pretrained model cloning the accent from the reference
+alone, no fine-tuning) and **alpha=1 = theta_ft** (the fully fine-tuned model, full
+accent-vector impact).
+
+The reference *kind* is itself a deliberately-varied experimental condition compared
+*across* sweeps (see scripts/eddie_infer_sweep.sh REF_KIND). It is NOT a fixed invariant:
+
+* **L1 reference** (target accent's native-language clip; paper-faithful cloning, see
+  ADAPTATION_PLAN.md gotcha #3). Because F5-TTS has no language-ID token or
+  speaker/perceiver factorisation, it clones whatever accent is in this clip, so accent
+  at alpha=0 comes from BOTH the reference and (as alpha rises) the vector -- the
+  confounded baseline.
+* **Neutral native-English reference** (a clip whose accent is NOT the target). At
+  alpha=0 the output is neutral English, so any target-accent signal emerging as alpha
+  climbs is attributable to the VECTOR alone -- the decoupling control that isolates the
+  fine-tuning's contribution from reference cloning.
 
 Note on the paper deviation: XTTS pins a language-ID token to keep content
 English while the delta supplies the accent. F5-TTS has no language-ID token,
@@ -140,7 +152,8 @@ def main():
                         help="F5 model config yaml (default: packaged F5TTS_v1_Base.yaml)")
     parser.add_argument("--vocab", default="", help="vocab.txt (default: packaged pretrained vocab)")
     parser.add_argument("--ref-audio", required=True,
-                        help="native-language (L1) reference clip, fixed across the sweep")
+                        help="reference clip to clone, fixed within the sweep (L1 or a "
+                             "neutral native-English control -- see module docstring)")
     parser.add_argument("--ref-text", required=True, help="transcript of the reference clip")
     parser.add_argument("--transcripts", required=True, help="English transcripts, one per line")
     parser.add_argument("--out-dir", required=True)

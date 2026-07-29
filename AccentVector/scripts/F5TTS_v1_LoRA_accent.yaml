@@ -19,7 +19,7 @@ datasets:
 
 optim:
   epochs: 100             # generous budget; you stop manually via the STOP sentinel file
-  learning_rate: 1e-4     # small-corpus LoRA lr
+  learning_rate: 3e-5     # matches Lertpetchpun et al. (Adam, lr 3e-5) — paper-faithful
   num_warmup_updates: 200  # was 20000 (Emilia-scale); far fewer updates on one accent
   grad_accumulation_steps: 1
   max_grad_norm: 1.0
@@ -45,7 +45,7 @@ model:
     attn_mask_enabled: False
     checkpoint_activations: False
     use_lora: True
-    lora_rank: 64
+    lora_rank: 16           # matches Lertpetchpun et al. (paper-faithful reproduction)
     lora_feature_dim: null  # single LoRA per run (one accent -> one vector)
   mel_spec:
     target_sample_rate: 24000

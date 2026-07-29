@@ -14,11 +14,19 @@ all `rq*` modules run on the Mac against the grid's audio.
 
 (Full-fine-tune track instead: `scripts/finetune.sh` → `scripts/extract_vector.sh` → `grid` without `--lora`, which merges each alpha.)
 
-**Sweep anchors (A1):** the reference is the accent's native-language (L1) clip (paper-faithful
-cloning), fixed across the sweep. **α=0 = θ_pre** — the pretrained model cloning the accent from
-the reference alone (no fine-tuning); **α=1 = θ_ft** — the fully fine-tuned model. So the sweep
-measures the fine-tuning's contribution from the base cloning level up to the full fine-tune.
-Each accent's reference goes in the config's `references` block.
+**Sweep anchors (A1):** the reference is fixed across a sweep; **α=0 = θ_pre** (pretrained) →
+**α=1 = θ_ft** (fully fine-tuned). Each accent's reference goes in the config's `references`
+block. The reference *kind* is a **deliberately-varied condition** run in two passes (sibling
+trees `results/<accent>/{l1,native}/`; via the Eddie wrapper set `REF_KIND=l1|native`):
+
+- **L1 reference** (paper-faithful): the accent's native-language clip. Because F5 clones accent
+  straight from the reference (no language-ID/speaker factorisation), α=0 *already sounds
+  accented* — so this pass measures the vector's **marginal** contribution and the α-curve
+  **shape** (gain vs leakage), not whether α=0 is accented.
+- **Neutral native-English reference** (decoupling control): a clip whose accent is *not* the
+  target, so α=0 is neutral English and any target-accent signal that emerges as α climbs is
+  **the vector's alone**. This isolates the fine-tuning from reference cloning — the
+  discriminating test of RQ1 (does the vector do anything the base model can't?).
 
 **Data.**
 - *Train (A0):* per accent, ~100 h of **native-language (L1)** speech — one dataset or several
@@ -49,6 +57,7 @@ Each accent's reference goes in the config's `references` block.
 | E1.2 | RQ1 | `rq1_reproduction` (wer col) | `rq1.csv` | WER rises with α faster than paper's XTTS (leakage) |
 | E1.3 | RQ1b | `rq1_reproduction --lid` (eng_lid col) | `rq1.csv` | P(English) falls with α — direct language drift, distinct from accent |
 | E1.4 | RQ1b | `rq1_reproduction` (leak-onset in footer) | `rq1.csv` | leakage-onset α lower on F5 than XTTS (missing language anchor) |
+| E1.5 | RQ1 | `rq1_reproduction` on **both** reference passes (`{l1,native}/`) | `rq1.csv` ×2 | accent ↑ with α under the **neutral** reference ⇒ vector adds accent independent of the reference; flat/leaky ⇒ L1-condition accent was cloning (valid negative result) |
 | E2.1 | RQ2 | `rq2_geometry` | `weight_space_cosine.csv`, `..._mds.csv` | accents cluster by family in MDS |
 | E2.2 | RQ2 | `rq2_geometry` (--synth) | `output_space_cosine.csv`, `rsa_mantel.txt` | Mantel r>0, p<0.05 but r<1 (imperfect) |
 | E2.3 | RQ2 | `rq2_geometry` (within- vs cross-English) | matrices | corpus contributes measurable distance |

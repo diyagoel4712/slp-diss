@@ -165,12 +165,15 @@ class Trainer:
 
         self.use_lora = use_lora
         parameter_with_grad = [p for p in model.parameters() if p.requires_grad]
+        # weight_decay=0.0 makes AdamW mathematically equivalent to plain Adam, matching
+        # the accent-vector paper (Lertpetchpun et al.: Adam, lr 3e-5). AdamW's default
+        # (0.01) would apply decoupled decay that regularises the LoRA vector magnitude.
         if bnb_optimizer:
             import bitsandbytes as bnb
 
-            self.optimizer = bnb.optim.AdamW8bit(parameter_with_grad, lr=learning_rate)
+            self.optimizer = bnb.optim.AdamW8bit(parameter_with_grad, lr=learning_rate, weight_decay=0.0)
         else:
-            self.optimizer = AdamW(parameter_with_grad, lr=learning_rate)
+            self.optimizer = AdamW(parameter_with_grad, lr=learning_rate, weight_decay=0.0)
         self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
 
         # Watch weight/gradient histograms in WandB ("params update" view).

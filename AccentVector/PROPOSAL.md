@@ -47,15 +47,30 @@ reference text, generation text), with a `char`/`pinyin` tokenizer. Consequences
    0), so they need romanized/transliterated transcripts, or a vocab extension, before fine-tuning. 
    **Verify the base vocab before assuming.**
 
-3. **Reference audio carries accent — and we keep it.** F5 clones the reference clip, so its 
-   accent feeds the output. Following the paper's cloning setup, we provide a **native-language 
-   (L1) reference of the target accent** at inference (e.g. Hindi
-   speech for the Indian accent), held **fixed per speaker across the α-sweep** so the vector
-   is the only thing varying within a sweep. The sweep runs between two exact anchors:
-   **α=0 = θ_pre** (the pretrained model, no fine-tuning, cloning the accent from the reference
-   alone) and **α=1 = θ_pre + τ = θ_ft** (the fully fine-tuned model, full accent-vector impact).
-   So it measures the fine-tuning's contribution as accent strength climbs from the base
-   cloning level to the full fine-tune, with speaker identity expected to hold across α.
+3. **Reference audio carries accent — so the reference is an experimental variable, not a
+   constant.** F5 clones the reference clip, and — crucially — because it has no language-ID
+   token or speaker/perceiver factorisation (unlike XTTS), it clones *whatever accent is in
+   that clip* directly into the output. A direct consequence, confirmed in our own listening:
+   **pretrained F5 (α=0) already produces convincingly accented English when cloning an L1
+   reference.** This is not the method working — it is the reference supplying the accent. It
+   makes the reference kind the load-bearing variable, so we sweep α under **two reference
+   conditions** (`scripts/eddie_infer_sweep.sh REF_KIND`, sibling output trees
+   `results/<accent>/{l1,native}/`):
+
+   - **L1 reference** (paper-faithful): a native-language clip of the target accent (e.g.
+     Hindi speech for the Indian accent), fixed within the sweep. **α=0 = θ_pre** (pretrained,
+     cloning accent from the reference alone) → **α=1 = θ_pre + τ = θ_ft** (fully fine-tuned).
+     Because the reference already carries accent, this condition measures the fine-tuning's
+     *marginal* contribution on top of an already-accented baseline — and the honest empirical
+     question is the **shape of the α-curve** (monotone accent gain vs leakage/degradation),
+     not whether α=0 sounds accented (it does, by construction).
+   - **Neutral native-English reference** (decoupling control): a clip whose accent is *not*
+     the target, so α=0 is neutral English and any target-accent signal emerging as α climbs
+     is attributable to **the vector alone**. This isolates the fine-tuning's contribution from
+     reference cloning — the discriminating test of whether the task vector does anything the
+     base model cannot, and the only condition under which the composition/mixing claims (which
+     a fixed accented reference can never demonstrate) are testable. Speaker identity is
+     expected to hold against *this* reference across α.
 
 
 ## Research questions & hypotheses
@@ -65,6 +80,15 @@ reference text, generation text), with a `char`/`pinyin` tokenizer. Consequences
   has **no language-ID token**? *H1:* mechanism transfers (α-monotonic accent,
   speaker retained). Tested by the accent-strength-vs-α monotonicity + speaker
   retention — the shape of the paper's Fig. 3 reproduced on a new backbone.
+  Because a non-factorised backbone clones accent straight from the reference, "does
+  α=0 sound accented" is *not* the question (it does, trivially, under an L1 reference);
+  the test is the **α-curve shape**, read jointly across the two reference conditions
+  (Method §3): does accent rise with α under the **neutral-reference** control (vector
+  doing real, reference-independent work) or only under the L1 reference (accent was
+  cloning)? A flat/leaky neutral-reference curve is a valid *negative* transfer result —
+  the sharpest statement that on flow-matching F5 the vector is largely redundant to
+  cloning. The seed signal is already visible in a British smoke test (`results/british/`,
+  n=4): accent-ID, WER and UTMOS all *degrade* as α→1.
 - **RQ1b — Language leakage and the language-ID anchor.** Because F5 has no
   language-ID token to hold content in English, does content drift toward the
   target *language* (not just accent) sooner than on XTTS? *H1b:* leakage sets in
@@ -84,11 +108,19 @@ reference text, generation text), with a `char`/`pinyin` tokenizer. Consequences
   (phone) and suprasegmental (F0/rhythm/tempo) features both move toward the
   natural target? *H3:* the vector is **segmental-dominated**, and the gap is
   widest for a prosodically-distant accent — explaining the Mandarin result.
+  This is untouched by the "F5 already sounds accented" observation: a clip *sounding*
+  accented says nothing about *which* structure carries it. The decomposition (segmental
+  `ppg_kl` vs suprasegmental F0/nPVI/articulation-rate gap-closure) is precisely what an
+  ear cannot separate, and remains the core contribution regardless of the RQ1 outcome.
 - **RQ4 — Intervention (stretch).** Can layer-targeted scaling or
   prosody-matched reference retrieval improve suprasegmental transfer? *H4:*
   yes, without collapsing speaker similarity.
 - **RQ5 — Evaluation bias.** Where does bias enter, and does a fairer protocol
   (relative WER, gender-disaggregated, familiarity-baselined) change conclusions?
+  The gap between *ear-perceived* accent (subjectively "convincing") and *measured*
+  accent (best-case only ~0.73 accent-embedding / ~26% accent-ID in our benchmark) is
+  itself an evaluation-bias data point: perceptual conviction overstates measured accent
+  fidelity, motivating the metric-first protocol used throughout.
 - **RQ6 — Fine-tuning trajectory (optional, Tier 1).** How does the accent vector
   form over training? Track `‖τ_t‖` and `cos(τ_t, τ_final)` across checkpoints.
   *H6:* the accent **direction** stabilises well before magnitude — so the

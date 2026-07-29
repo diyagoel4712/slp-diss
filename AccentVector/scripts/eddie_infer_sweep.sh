@@ -50,10 +50,31 @@ export ALPHAS=${ALPHAS:-"0,0.2,0.4,0.6,0.8,1.0"}
 # to its first element (ALPHAS="0,0.25,..." -> ALPHAS=0). Pass ALPHAS space-separated on
 # the qsub line (e.g. ALPHAS="0 0.25 0.5 0.75 1.0") and normalise spaces to commas here.
 export ALPHAS="${ALPHAS// /,}"
-# native-language (L1) reference for this accent + its (Dutch) transcript. REQUIRED to
-# match the clip exactly -- no sensible default, so fail loudly if unset.
-export REF_AUDIO=${REF_AUDIO:?set REF_AUDIO=refs/<accent>_l1.wav (the fixed L1 reference clip)}
-export REF_TEXT=${REF_TEXT:?set REF_TEXT to the exact transcript of REF_AUDIO (or a path to a file holding it)}
+# reference condition -- WHICH clip F5 clones. This is the accent-decoupling control:
+#   l1     (default) the accent's native-language reference. Paper-faithful, but accent
+#                    comes from BOTH cloning the L1 clip AND the vector -> the confounded
+#                    baseline. REF_AUDIO/REF_TEXT REQUIRED (must match the clip exactly).
+#   native           a neutral native-English clip whose accent is NOT the target, so at
+#                    alpha=0 the output is neutral English and any target-accent signal
+#                    that emerges as alpha climbs is attributable to the VECTOR alone.
+#                    Defaults to refs/native_ga.{wav,txt} (supply the clip) unless overridden.
+# REF_KIND (a) picks that default for `native` and (b) suffixes OUT_DIR so the two
+# conditions land in sibling trees results/<accent>/<ref_kind>/ for a clean comparison.
+export REF_KIND=${REF_KIND:-l1}
+case "$REF_KIND" in
+    native)
+        export REF_AUDIO=${REF_AUDIO:-"$ACCENT_DIR/refs/native_ga.wav"}
+        export REF_TEXT=${REF_TEXT:-"$ACCENT_DIR/refs/native_ga.txt"}
+        ;;
+    l1)
+        # no sensible default for an L1 clip, so fail loudly if unset.
+        export REF_AUDIO=${REF_AUDIO:?set REF_AUDIO=refs/<accent>_l1.wav (the fixed L1 reference clip)}
+        export REF_TEXT=${REF_TEXT:?set REF_TEXT to the exact transcript of REF_AUDIO (or a path to a file holding it)}
+        ;;
+    *)
+        echo "ERROR: REF_KIND must be 'l1' or 'native' (got '$REF_KIND')" >&2; exit 1
+        ;;
+esac
 # REF_TEXT may be either the literal transcript or a path to a file containing it
 # (handy for long L1 references -- avoids retyping/mis-quoting in the qsub -v line).
 # Resolve relative paths against the submission dir, mirroring the other inputs.
@@ -63,13 +84,13 @@ elif [ -f "$ACCENT_DIR/$REF_TEXT" ]; then
     REF_TEXT="$(cat "$ACCENT_DIR/$REF_TEXT")"
 fi
 export REF_TEXT
-export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}"}
+export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}/${REF_KIND}"}
 # LoRA is the paper-matching default in infer_sweep.sh; set LORA=0 for a merged sweep.
 export LORA=${LORA:-1}
 
 echo "accent=$ACCENT_NAME  vector=$VECTOR"
 echo "config=$CONFIG  vocab=$VOCAB"
-echo "ref=$REF_AUDIO  alphas=$ALPHAS  out=$OUT_DIR"
+echo "ref_kind=$REF_KIND  ref=$REF_AUDIO  alphas=$ALPHAS  out=$OUT_DIR"
 nvidia-smi -L || true
 python -c "import torch; print('torch', torch.__version__, 'cuda', torch.version.cuda, 'avail', torch.cuda.is_available())"
 
