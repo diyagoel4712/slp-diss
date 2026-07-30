@@ -15,6 +15,12 @@ Backends (--backend):
                      IAST adds chars that may be OOV -- prefer HK/ITRANS, then vocab_check).
   uroman             universal romaniser (ASCII). needs the `uroman` python package.
 
+By default an ASCII-fold safety net runs after transliteration (NFKD + drop non-ASCII):
+the ASCII schemes target ASCII, so any leftover non-ASCII is untransliterated residue
+(rare candra vowels, orphan nukta, stray Unicode noise) that would be OOV -- folding it
+away guarantees vocab-safe output. Disable with --no-ascii-fold (e.g. for an IAST run
+whose diacritics you've added to vocab.txt).
+
 Idempotent per row; re-runnable. Non-script characters (Latin code-switches, digits,
 punctuation) pass through untouched in every backend.
 """
@@ -22,9 +28,22 @@ punctuation) pass through untouched in every backend.
 import argparse
 import csv
 import sys
+import unicodedata
 from pathlib import Path
 
 from tqdm import tqdm
+
+
+def ascii_fold(s):
+    """Guarantee vocab-safe output: NFKD-normalise and drop any non-ASCII. The ASCII
+    romanisation schemes (HK/ITRANS, IndicXlit, uroman) target ASCII, so anything
+    non-ASCII left over is untransliterated residue (rare candra vowels, orphan nukta,
+    stray Unicode noise) that would be OOV against F5's Latin base vocab. Returns the
+    folded string and the count of characters removed."""
+    folded = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode("ascii")
+    folded = " ".join(folded.split())
+    dropped = sum(1 for c in s if not c.isspace()) - sum(1 for c in folded if not c.isspace())
+    return folded, max(0, dropped)
 
 
 def make_indicxlit(lang):
@@ -72,7 +91,12 @@ def main():
                     help="indic-translit output scheme: HK|ITRANS (ASCII) or IAST (diacritics)")
     ap.add_argument("--in-name", default="metadata.csv")
     ap.add_argument("--out-name", default="metadata.roman.csv")
+    ap.add_argument("--no-ascii-fold", action="store_true",
+                    help="skip the ASCII-fold safety net (keep whatever the backend emits, "
+                         "incl. non-ASCII residue). Default is to fold -> guaranteed vocab-safe. "
+                         "Use only with a diacritic scheme (IAST) whose chars you've added to vocab.")
     args = ap.parse_args()
+    fold = not args.no_ascii_fold
 
     clips = Path(args.clips)
     src = clips / args.in_name
@@ -90,13 +114,19 @@ def main():
         rows = [row for row in r if len(row) >= 2]
     print(f"romanising {len(rows)} rows with {args.backend} (lang={args.lang})", file=sys.stderr)
 
-    n_empty = 0
+    n_empty = n_folded_rows = n_folded_chars = 0
     with open(out, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f, delimiter="|")
         w.writerow(header)
         for rel, text in tqdm(rows, unit="row"):
             roman = romanise(text)
             roman = " ".join((roman or "").split())
+            if fold:
+                folded, dropped = ascii_fold(roman)
+                if dropped:
+                    n_folded_rows += 1
+                    n_folded_chars += dropped
+                roman = folded
             if not roman:
                 n_empty += 1
                 continue
@@ -105,6 +135,9 @@ def main():
     print(f"\nwrote {len(rows) - n_empty}/{len(rows)} rows -> {out}", file=sys.stderr)
     if n_empty:
         print(f"  ({n_empty} rows romanised to empty and were dropped)", file=sys.stderr)
+    if fold and n_folded_chars:
+        print(f"  (ASCII-fold removed {n_folded_chars} non-ASCII residue chars "
+              f"across {n_folded_rows} rows)", file=sys.stderr)
     print("  next: python vocab_check.py --metadata "
           f"{out}   (expect ~0 OOV; investigate any misses)", file=sys.stderr)
 
