@@ -65,9 +65,10 @@ trees `results/<accent>/{l1,native}/`; via the Eddie wrapper set `REF_KIND=l1|na
 | E3.2 | RQ3 | `rq3_decomposition` (supra cols) | `rq3.csv` | F0/rhythm move little toward natural |
 | E3.3 | RQ3 | `rq3_decomposition` (closure) | `rq3.csv` | seg_closure ≫ supra_closure_mean, widest for distant accent |
 | E3.4 | RQ3 | `rq3_layers` | `rq3_layers.csv` | accent energy concentrates in identifiable modules/depth |
-| E4.1 | RQ4* | `extract_vector compose --include` + `rq3_decomposition` | `rq3.csv` | up-weighting prosody-layers raises supra_closure |
+| E4.1 | RQ4* | `infer_accent --include-layers/--exclude-layers` (LoRA-native mask) or `extract_vector compose --include` (merged) → `rq3_decomposition` | `rq3.csv` | scaling only accent layers (e.g. `--exclude-layers text_embed input_embed`) keeps English fluent (wer flat) while raising accent; up-weighting prosody layers raises supra_closure |
 | E4.2 | RQ4* | reference retrieval (stub) + `rq3` | — | matched reference raises supra transfer |
 | E6.1 | RQ6 | `rq6_temporal` | `temporal.csv` | `cos(τ_t, τ_final)` converges before magnitude (direction learnable early) |
+| E6.2 | RQ6×RQ1 | `checkpoint_grid` → `rq1_reproduction` per step → `rq6_behavioural` | `by_step_summary.csv`, `*_by_step_alpha.csv`, `matched_alpha_trends.csv` | accent (accent_acc/cs) saturates with step at low-mid α while `wer` rises and `wer_leak_onset` **falls** with step ⇒ accent learned before language; earlier checkpoint + moderate α is the fluent-accented sweet spot |
 
 `*` RQ4 is the stretch tier. **E6.1 is Tier-1 only** (optimisation trajectory,
 near-free): needs intermediate `model_<step>.pt` checkpoints saved during A0.
@@ -112,5 +113,50 @@ python -m accent_vector.experiments.rq2_geometry --vector indian=vectors/indian.
     --synth spanish=results/spanish/s1/alpha_1.0 --out-dir results/geometry            # E2
 python -m accent_vector.experiments.rq6_temporal --lora \
     --ckpt-dir exps/F5TTS_v1_LoRA_indian/<run>/ckpts/snapshots \
-    --out-csv results/indian/temporal.csv                                             # E6
+    --out-csv results/indian/temporal.csv                                             # E6.1
+```
+
+### Layer-masked accent (E4.1) — "accent without the language"
+
+On the LoRA track the mask is native: `set_lora_alpha` zeroes the un-selected
+branches, so `infer_accent` (and `checkpoint_grid`) take `--include-layers` /
+`--exclude-layers` (substrings over LoRA submodule names — `attn`, `ff`, `conv`,
+`text_embed`, `input_embed`, `lora_proj_out`, or a block index like `.5.`). Excluding
+the content/language path is the direct attack on the α=1 gibberish:
+
+```bash
+# scale accent-carrying layers only; leave the text/content path at theta_pre
+python -m accent_vector.infer_accent --lora \
+    --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt --lora-vector vectors/dutch.pt \
+    --config <run>/config.yaml --vocab <run>/vocab.txt --alphas 0,0.5,1.0 \
+    --exclude-layers text_embed --exclude-layers input_embed \
+    --ref-audio refs/native_ga.wav --ref-text "..." \
+    --transcripts transcripts/eval_transcripts.txt --out-dir results/dutch/masked
+# then score results/dutch/masked with rq1/rq3 as usual and compare to the unmasked sweep
+```
+
+### Checkpoint × alpha comparison (E6.2) — accent-vs-language over training
+
+Needs `snapshot_per_updates` snapshots (or full `model_<step>.pt`) from A0. Render
+each checkpoint's sweep, score each, then collate at matched α — ideally against the
+**neutral** reference so an accent rise is the vector, not cloning:
+
+```bash
+# GPU: alpha sweep at several checkpoints -> results/dutch/native/by_step/step_<step>/
+python -m accent_vector.experiments.checkpoint_grid \
+    --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt \
+    --config <run>/config.yaml --vocab <run>/vocab.txt \
+    --snap-dir <run>/ckpts/snapshots --steps 5000,15000,25000,45000 \
+    --ref-audio refs/native_ga.wav --ref-text-file refs/native_ga.txt \
+    --transcripts transcripts/eval_transcripts.txt --alphas 0,0.25,0.5,0.75,1.0 \
+    --out-root results/dutch/native/by_step
+
+# CPU: score each checkpoint, then compare matched-alpha across training
+for s in results/dutch/native/by_step/step_*/; do
+  python -m accent_vector.experiments.rq1_reproduction --sweep-dir "$s" \
+    --transcripts transcripts/eval_transcripts.txt --ref-wav refs/native_ga.wav \
+    --accent-ref natural/dutch --target-accent Dutch --out-csv "$s/rq1.csv"
+done
+python -m accent_vector.experiments.rq6_behavioural \
+    --by-step-dir results/dutch/native/by_step --out-dir results/dutch/native/trajectory
 ```

@@ -29,6 +29,10 @@ REF_AUDIO=${REF_AUDIO:-"$ACCENT_DIR/refs/england.wav"}
 REF_TEXT=${REF_TEXT:-"Some call me nature, others call me mother nature."}
 TRANSCRIPTS=${TRANSCRIPTS:-"$ACCENT_DIR/transcripts/eval_transcripts.txt"}
 OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}"}
+# transcript sharding for multi-GPU fan-out: render only indices == SHARD_INDEX (mod
+# SHARD_COUNT), keeping the global utt#### name so shards reassemble into one alpha_<a>/.
+SHARD_INDEX=${SHARD_INDEX:-0}
+SHARD_COUNT=${SHARD_COUNT:-1}
 
 LORA=${LORA:-1}   # 1 = native LoRA sweep (paper-matching, default); 0 = merged full-weight sweep
 
@@ -39,6 +43,8 @@ ARGS=(
     --ref-text "$REF_TEXT"
     --transcripts "$TRANSCRIPTS"
     --out-dir "$OUT_DIR"
+    --shard-index "$SHARD_INDEX"
+    --shard-count "$SHARD_COUNT"
 )
 
 if [ "$LORA" = "1" ]; then

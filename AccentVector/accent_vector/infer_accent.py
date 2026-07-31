@@ -101,14 +101,27 @@ def build_model(config_path, ckpt_path, vocab_file, device):
 
 
 def synthesize_set(model, vocoder, mel_spec_type, ref_audio, ref_text,
-                   transcripts, out_dir, nfe_step, seed, device, lora_idx=None):
+                   transcripts, out_dir, nfe_step, seed, device, lora_idx=None,
+                   shard_index=0, shard_count=1):
+    """Synthesize each transcript to ``<out_dir>/utt####.wav``.
+
+    ``shard_count`` > 1 splits the work across parallel jobs: this call renders
+    only transcripts whose GLOBAL index ``idx % shard_count == shard_index`` but
+    keeps the global ``utt{idx}`` name -- so shards write DISJOINT files into the
+    same dir (safe under exist_ok), reassemble into one complete alpha_<a>/, and
+    the utt#### <-> transcript-index mapping the eval reads is unchanged. Per-utt
+    RNG is reseeded to ``seed`` regardless of shard, so a clip is byte-identical
+    whether or not it was sharded."""
     os.makedirs(out_dir, exist_ok=True)
     ref_audio, ref_text = preprocess_ref_audio_text(ref_audio, ref_text)
     if lora_idx is not None and not torch.is_tensor(lora_idx):
         # dit.py's forward always does lora_idx[0]; resolve_lora_idx/--lora-idx
         # give a plain int, which trained via collate_fn's tensor would never be.
         lora_idx = torch.tensor([lora_idx], device=device)
+    n = 0
     for idx, gen_text in enumerate(transcripts):
+        if shard_count > 1 and idx % shard_count != shard_index:
+            continue
         # this fork's infer_process has no seed kwarg (unlike stock F5-TTS);
         # seed identically via the RNG directly before each call instead.
         torch.manual_seed(seed)
@@ -118,16 +131,23 @@ def synthesize_set(model, vocoder, mel_spec_type, ref_audio, ref_text,
             lora_idx=lora_idx,
         )
         sf.write(os.path.join(out_dir, f"utt{idx:04d}.wav"), wave, sr)
-    print(f"[infer] wrote {len(transcripts)} clips -> {out_dir}")
+        n += 1
+    shard_note = f" (shard {shard_index}/{shard_count})" if shard_count > 1 else ""
+    print(f"[infer] wrote {n} clips{shard_note} -> {out_dir}")
 
 
 def synthesize_lora_sweep(pretrained, lora_vector, config_path, vocab, alphas,
                           ref_audio, ref_text, transcripts, out_dir,
-                          nfe, seed, device, lora_idx=0):
+                          nfe, seed, device, lora_idx=0, include=None, exclude=None,
+                          shard_index=0, shard_count=1):
     """Native LoRA alpha sweep: build the base+LoRA model once, then rescale the
     accent branch to each alpha in place (no per-alpha checkpoint merge). Writes
     ``<out_dir>/alpha_<a>/utt####.wav`` -- the same layout the merged path uses,
-    so every downstream analysis reads it identically."""
+    so every downstream analysis reads it identically.
+
+    ``include`` / ``exclude`` (substrings over LoRA submodule names) restrict the
+    scaling to a subset of layers -- layer-targeted accent transfer (RQ4); masked
+    submodules stay at theta_pre. See ``lora_model.set_lora_alpha``."""
     from accent_vector.lora_model import (
         build_base_model, load_lora_state, overlay_lora, set_lora_alpha,
     )
@@ -137,12 +157,15 @@ def synthesize_lora_sweep(pretrained, lora_vector, config_path, vocab, alphas,
     overlay_lora(model, load_lora_state(lora_vector, device))
     model.eval()
     for alpha in alphas:
-        n = set_lora_alpha(model, alpha)
-        print(f"[infer:lora] alpha={alpha} on {n} LoRA submodules (lora_idx={lora_idx})")
+        n_scaled, n_masked = set_lora_alpha(model, alpha, include=include, exclude=exclude)
+        mask_note = f", {n_masked} masked->theta_pre" if n_masked else ""
+        print(f"[infer:lora] alpha={alpha} on {n_scaled} LoRA submodules{mask_note} "
+              f"(lora_idx={lora_idx})")
         synthesize_set(
             model, vocoder, mel_spec_type, ref_audio, ref_text,
             transcripts, os.path.join(out_dir, f"alpha_{alpha}"),
             nfe, seed, device, lora_idx=lora_idx,
+            shard_index=shard_index, shard_count=shard_count,
         )
 
 
@@ -176,7 +199,24 @@ def main():
     parser.add_argument("--lora-label", help="accent label to look up in --lora-mapping")
     parser.add_argument("--lora-mapping", help="lora_mapping.json (label -> branch idx)")
 
+    # layer masking (RQ4 / RQ3.4): scale only a subset of the vector's layers.
+    parser.add_argument("--include-layers", action="append", default=[],
+                        help="only scale layers whose name/key contains this substring "
+                             "(repeatable; e.g. attn, ff, conv). Others stay at theta_pre.")
+    parser.add_argument("--exclude-layers", action="append", default=[],
+                        help="never scale layers whose name/key contains this substring "
+                             "(repeatable; e.g. text_embed to drop the content/language path).")
+
+    # transcript sharding for multi-GPU fan-out: split the transcript list across
+    # <shard-count> parallel jobs; this one renders indices == shard-index (mod count).
+    parser.add_argument("--shard-index", type=int, default=0, help="this shard's id, 0..count-1")
+    parser.add_argument("--shard-count", type=int, default=1, help="total shards (1 = no sharding)")
+
     args = parser.parse_args()
+    include = args.include_layers or None
+    exclude = args.exclude_layers or None
+    if not (0 <= args.shard_index < args.shard_count):
+        raise SystemExit(f"--shard-index must be in [0, {args.shard_count}); got {args.shard_index}")
 
     transcripts = load_transcripts(args.transcripts)
 
@@ -194,6 +234,8 @@ def main():
             args.pretrained, args.lora_vector, args.config, args.vocab, alphas,
             args.ref_audio, args.ref_text, transcripts, args.out_dir,
             args.nfe, args.seed, args.device, lora_idx=lora_idx,
+            include=include, exclude=exclude,
+            shard_index=args.shard_index, shard_count=args.shard_count,
         )
         return
 
@@ -207,6 +249,7 @@ def main():
         synthesize_set(
             model, vocoder, mel_spec_type, args.ref_audio, args.ref_text,
             transcripts, args.out_dir, args.nfe, args.seed, args.device,
+            shard_index=args.shard_index, shard_count=args.shard_count,
         )
         return
 
@@ -217,12 +260,14 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         for alpha in alphas:
             ckpt = os.path.join(tmp, f"accent_a{alpha}.pt")
-            compose(args.pretrained, [(args.vector, alpha)], ckpt, verbose=False)
+            compose(args.pretrained, [(args.vector, alpha)], ckpt,
+                    include=include, exclude=exclude, verbose=False)
             model, mel_spec_type = build_model(config_path, ckpt, args.vocab, args.device)
             synthesize_set(
                 model, vocoder, mel_spec_type, args.ref_audio, args.ref_text,
                 transcripts, os.path.join(args.out_dir, f"alpha_{alpha}"),
                 args.nfe, args.seed, args.device,
+                shard_index=args.shard_index, shard_count=args.shard_count,
             )
             os.remove(ckpt)
 

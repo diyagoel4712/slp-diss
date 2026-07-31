@@ -30,6 +30,8 @@ from f5_tts.model import CFM
 from f5_tts.model.utils import get_tokenizer
 from f5_tts.infer.utils_infer import load_vocoder
 
+from accent_vector.extract_vector import _key_selected  # shared layer-mask predicate
+
 
 def base_state_dict(base_ckpt, device):
     """Base (non-LoRA) weights keyed like the CFM's own state_dict (EMA preferred).
@@ -111,13 +113,34 @@ def overlay_lora(model, lora_state):
     model.load_state_dict(lora_state, strict=False)
 
 
-def set_lora_alpha(model, alpha):
+def set_lora_alpha(model, alpha, include=None, exclude=None):
     """Scale the accent branch to strength ``alpha`` (Eq. 4) by setting lora_alpha on
-    every LoRA submodule. Returns the number of submodules touched."""
+    each LoRA submodule. Returns ``(n_scaled, n_masked)``.
+
+    ``include`` / ``exclude`` are lists of substrings matched (via the same
+    ``extract_vector._key_selected`` predicate used by the full-FT ``compose``
+    path) against each LoRA submodule's **qualified name** from ``named_modules()``
+    -- e.g. ``transformer_blocks.5.attn.lora_q``, ``...ff.lora_project_in``,
+    ``conv_pos_embed.lora_conv1d.0``, ``text_embed.lora_linear``. Submodules that
+    are NOT selected have their branch zeroed (``lora_alpha = 0``), so they stay at
+    theta_pre -- realising layer-targeted accent scaling (RQ4) and layer
+    localisation (RQ3.4) natively on the LoRA track, with no checkpoint merge.
+
+    NOTE the substring vocabulary differs from ``compose``'s: here it matches
+    module names (dotted, e.g. ``attn``/``ff``/``conv``/``text_embed``/a block
+    index like ``.5.``); ``compose`` matches flattened state-dict keys that also
+    carry the ``lora_*`` leaf and an ``@`` separator. Pick substrings present in
+    the space you are masking.
+    """
     a = float(alpha)
-    n = 0
-    for m in model.modules():
-        if hasattr(m, "lora_alpha"):
+    n_scaled = n_masked = 0
+    for name, m in model.named_modules():
+        if not hasattr(m, "lora_alpha"):
+            continue
+        if _key_selected(name, include, exclude):
             m.lora_alpha = a
-            n += 1
-    return n
+            n_scaled += 1
+        else:
+            m.lora_alpha = 0.0
+            n_masked += 1
+    return n_scaled, n_masked
