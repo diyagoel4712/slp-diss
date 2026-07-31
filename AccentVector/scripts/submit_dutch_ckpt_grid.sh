@@ -22,7 +22,7 @@ ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
 ACCENT=dutch
 
 RUN_DIR=${RUN_DIR:-/exports/eddie/scratch/s2247837/accentvector-exps/F5TTS_v1_LoRA_dutch/2026-07-24_00-34-07}
-CKPT_DIR=${CKPT_DIR:-"$RUN_DIR/ckpts"}
+CKPT_DIR=${CKPT_DIR:-"$RUN_DIR/ckpts/snapshots"}
 LAST_STEP=${LAST_STEP:-73400}
 N_CHECKPOINTS=${N_CHECKPOINTS:-8}
 REF_KINDS=${REF_KINDS:-"l1 native"}
