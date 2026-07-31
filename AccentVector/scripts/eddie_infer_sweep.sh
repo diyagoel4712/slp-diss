@@ -39,6 +39,11 @@ ACCENT_DIR="${SGE_O_WORKDIR:-$PWD}"
 # --- run config (all overridable via `qsub -v KEY=VAL,...`) ---
 export F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}
 export ACCENT_NAME=${ACCENT_NAME:-dutch}
+# optional speaker id for multi-speaker runs (e.g. f, m). When set it (a) picks the
+# per-speaker `native` default clip refs/native_ga_<spk>.{wav,txt} and (b) nests OUT_DIR
+# one level deeper so male/female sweeps don't overwrite each other. Empty = single-speaker
+# (unchanged layout). The L1 clip is always passed explicitly, so SPEAKER doesn't default it.
+export SPEAKER=${SPEAKER:-}
 # training run dir holds config.yaml + vocab.txt (needed to rebuild the base+LoRA model).
 export RUN_DIR=${RUN_DIR:-/exports/eddie/scratch/s2247837/accentvector-exps/F5TTS_v1_LoRA_dutch/2026-07-24_00-34-07}
 export CONFIG=${CONFIG:-"$RUN_DIR/config.yaml"}
@@ -63,8 +68,9 @@ export ALPHAS="${ALPHAS// /,}"
 export REF_KIND=${REF_KIND:-l1}
 case "$REF_KIND" in
     native)
-        export REF_AUDIO=${REF_AUDIO:-"$ACCENT_DIR/refs/native_ga.wav"}
-        export REF_TEXT=${REF_TEXT:-"$ACCENT_DIR/refs/native_ga.txt"}
+        # per-speaker default when SPEAKER is set (native_ga_f.wav), else the shared clip.
+        export REF_AUDIO=${REF_AUDIO:-"$ACCENT_DIR/refs/native_ga${SPEAKER:+_$SPEAKER}.wav"}
+        export REF_TEXT=${REF_TEXT:-"$ACCENT_DIR/refs/native_ga${SPEAKER:+_$SPEAKER}.txt"}
         ;;
     l1)
         # no sensible default for an L1 clip, so fail loudly if unset.
@@ -84,11 +90,12 @@ elif [ -f "$ACCENT_DIR/$REF_TEXT" ]; then
     REF_TEXT="$(cat "$ACCENT_DIR/$REF_TEXT")"
 fi
 export REF_TEXT
-export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}/${REF_KIND}"}
+# nest per-speaker (results/<accent>/<ref_kind>/<speaker>/) when SPEAKER is set.
+export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}/${REF_KIND}${SPEAKER:+/$SPEAKER}"}
 # LoRA is the paper-matching default in infer_sweep.sh; set LORA=0 for a merged sweep.
 export LORA=${LORA:-1}
 
-echo "accent=$ACCENT_NAME  vector=$VECTOR"
+echo "accent=$ACCENT_NAME  speaker=${SPEAKER:-<none>}  vector=$VECTOR"
 echo "config=$CONFIG  vocab=$VOCAB"
 echo "ref_kind=$REF_KIND  ref=$REF_AUDIO  alphas=$ALPHAS  out=$OUT_DIR"
 nvidia-smi -L || true
