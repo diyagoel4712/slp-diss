@@ -270,6 +270,34 @@ def aid_acc(synthesised_files, target_accents, predict_fn=predict_accent_genaid,
     return correct / len(target_accents)
 
 # -----------------------------------------------------------------------------------------------------------------------
+# 5b. Spoken language-ID (P(English)) -- RQ1b language leakage
+
+def predict_lid_english(wav_files, device="cpu"):
+    """
+    run VoxLingua107 spoken-LID (isolated env) -> list of dicts with 'wav',
+    'p_english' (posterior mass on English), 'pred_lang', 'p_pred'.
+
+    P(English) is the direct language-drift signal for RQ1b: it falls as the
+    accent vector pulls content out of English, distinct from WER (which conflates
+    drift with the ASR's accent penalty). Consumed by
+    ``rq1_reproduction._english_lid`` when run with ``--lid``.
+    """
+    import json, subprocess, tempfile
+
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+        f.write("\n".join(wav_files))
+        list_path = f.name
+    out_path = list_path + ".lid.json"
+
+    subprocess.run(
+        [_GENAID_PYTHON, "predict_lid.py",
+         "--wav_list", list_path, "--device", device, "--out", out_path],
+        cwd=_GENAID_DIR, check=True,
+    )
+    with open(out_path) as fh:
+        return json.load(fh)
+
+# -----------------------------------------------------------------------------------------------------------------------
 # 6. CS for accent embeddings
 def cs_accent(synthesised_files, ground_truth_files,
               predict_fn=predict_accent_genaid, return_per_pair=False):

@@ -53,7 +53,7 @@ trees `results/<accent>/{l1,native}/`; via the Eddie wrapper set `REF_KIND=l1|na
 
 | ID | RQ | Module | Output | Confirms hypothesis if |
 |----|----|--------|--------|------------------------|
-| E1.1 | RQ1 | `rq1_reproduction` | `rq1.csv` | accent ↑ monotonic with α (Spearman>0), spk-sim flat/high |
+| E1.1 | RQ1 | `rq1_reproduction` | `rq1.csv` | accent (`accent_cs`) ↑ monotonic with α (Spearman>0), spk-sim flat/high |
 | E1.2 | RQ1 | `rq1_reproduction` (wer col) | `rq1.csv` | WER rises with α faster than paper's XTTS (leakage) |
 | E1.3 | RQ1b | `rq1_reproduction --lid` (eng_lid col) | `rq1.csv` | P(English) falls with α — direct language drift, distinct from accent |
 | E1.4 | RQ1b | `rq1_reproduction` (leak-onset in footer) | `rq1.csv` | leakage-onset α lower on F5 than XTTS (missing language anchor) |
@@ -68,7 +68,7 @@ trees `results/<accent>/{l1,native}/`; via the Eddie wrapper set `REF_KIND=l1|na
 | E4.1 | RQ4* | `infer_accent --include-layers/--exclude-layers` (LoRA-native mask) or `extract_vector compose --include` (merged) → `rq3_decomposition` | `rq3.csv` | scaling only accent layers (e.g. `--exclude-layers text_embed input_embed`) keeps English fluent (wer flat) while raising accent; up-weighting prosody layers raises supra_closure |
 | E4.2 | RQ4* | reference retrieval (stub) + `rq3` | — | matched reference raises supra transfer |
 | E6.1 | RQ6 | `rq6_temporal` | `temporal.csv` | `cos(τ_t, τ_final)` converges before magnitude (direction learnable early) |
-| E6.2 | RQ6×RQ1 | `checkpoint_grid` → `rq1_reproduction` per step → `rq6_behavioural` | `by_step_summary.csv`, `*_by_step_alpha.csv`, `matched_alpha_trends.csv` | accent (accent_acc/cs) saturates with step at low-mid α while `wer` rises and `wer_leak_onset` **falls** with step ⇒ accent learned before language; earlier checkpoint + moderate α is the fluent-accented sweet spot |
+| E6.2 | RQ6×RQ1 | `checkpoint_grid` → `rq1_reproduction` per step → `rq6_behavioural` | `by_step_summary.csv`, `*_by_step_alpha.csv`, `matched_alpha_trends.csv` | accent (`accent_cs`) saturates with step at low-mid α while `wer` rises and `wer_leak_onset` **falls** with step ⇒ accent learned before language; earlier checkpoint + moderate α is the fluent-accented sweet spot |
 
 `*` RQ4 is the stretch tier. **E6.1 is Tier-1 only** (optimisation trajectory,
 near-free): needs intermediate `model_<step>.pt` checkpoints saved during A0.
@@ -77,11 +77,12 @@ error bounds) is out of scope — step ≠ data amount.
 
 ## Not yet wired (documented integration points)
 
-- **LID probability** (E1.3) — `rq1_reproduction --lid` has the hook; it calls
-  `evaluation_functions.predict_lid_english` if present. Wire that to
-  VoxLingua107 (`speechbrain/lang-id-voxlingua107-ecapa`) in the isolated env to
-  activate the eng_lid column and the LID-based leakage onset. Until then WER
-  carries the leakage signal and the WER-based onset still reports.
+- **LID probability** (E1.3) — **wired.** `rq1_reproduction --lid` calls
+  `evaluation_functions.predict_lid_english`, which runs VoxLingua107
+  (`speechbrain/lang-id-voxlingua107-ecapa`) in the isolated `genaid` env via the
+  `recipes/CommonAccent/predict_lid.py` wrapper and returns P(English) per clip →
+  activates the `eng_lid` column and the LID-based leakage onset. WER still
+  provides a parallel (accent-confounded) leakage signal.
 - **XTTS token ablation** (RQ1b clean isolation) — out of scope here (needs XTTS
   re-stood-up); the F5-vs-XTTS onset gap confounds backbone with the missing
   language-ID token, so report it as evidence, not proof. See PROPOSAL.md RQ1b.
@@ -99,7 +100,7 @@ python -m accent_vector.experiments.grid --config grid.json --lora             #
 for s in results/indian/*/; do sp=$(basename "$s")
   python -m accent_vector.experiments.rq1_reproduction --sweep-dir "$s" \
       --transcripts transcripts/eval_transcripts.txt --ref-wav refs/indian/$sp.wav \
-      --accent-ref natural/indian/$sp --target-accent Indian --out-csv "$s/rq1.csv"
+      --accent-ref natural/indian/$sp --lid --out-csv "$s/rq1.csv"
   python -m accent_vector.experiments.rq3_decomposition --sweep-dir "$s" \
       --natural-ref natural/indian/$sp --out-csv "$s/rq3.csv"
 done
@@ -155,7 +156,7 @@ python -m accent_vector.experiments.checkpoint_grid \
 for s in results/dutch/native/by_step/step_*/; do
   python -m accent_vector.experiments.rq1_reproduction --sweep-dir "$s" \
     --transcripts transcripts/eval_transcripts.txt --ref-wav refs/native_ga.wav \
-    --accent-ref natural/dutch --target-accent Dutch --out-csv "$s/rq1.csv"
+    --accent-ref natural/dutch --lid --out-csv "$s/rq1.csv"
 done
 python -m accent_vector.experiments.rq6_behavioural \
     --by-step-dir results/dutch/native/by_step --out-dir results/dutch/native/trajectory

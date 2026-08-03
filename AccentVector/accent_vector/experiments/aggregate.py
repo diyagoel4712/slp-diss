@@ -17,7 +17,7 @@ per-speaker CSVs sharing an ``alpha`` column work (rq1, rq3, ...).
     for s in results/indian/*/; do sp=$(basename "$s")
       python -m accent_vector.experiments.rq1_reproduction --sweep-dir "$s" \
         --transcripts transcripts/eval_transcripts.txt --ref-wav refs/indian/$sp.wav \
-        --accent-ref natural/indian/$sp --target-accent Indian --out-csv "$s/rq1.csv"
+        --accent-ref natural/indian/$sp --lid --out-csv "$s/rq1.csv"
     done
     python -m accent_vector.experiments.aggregate \
         --accent-dir results/indian --csv-name rq1.csv --out-dir results/indian

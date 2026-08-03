@@ -18,7 +18,7 @@ per-checkpoint CSVs (matched on the ``alpha`` column) into:
     by_step_summary.csv          step, wer_leak_onset, <metric>@max-alpha
 
 How to read it for the core question:
-  * accent (accent_acc / accent_cs) rising with STEP at low-mid alpha, then flat
+  * accent (accent_cs) rising with STEP at low-mid alpha, then flat
     => accent is basically learned; more steps add little accent.
   * wer rising with STEP at fixed alpha, and wer_leak_onset FALLING with step
     => more training makes English *less* fluent / leaks sooner (RQ1b). If accent

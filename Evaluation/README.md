@@ -21,6 +21,7 @@ synthesised speech against natural reference speech (VCTK).
 | 6 | `cs_accent` | accent-embedding cosine sim | GenAID embeddings | `genaid` |
 | 7 | `ppg_kl` | segmental pronunciation | wav2vec2 phoneme-CTC | `.conda` |
 | 8 | `speaker_similarity` | speaker identity (SECS) | ECAPA-TDNN | `genaid` |
+| 9 | `predict_lid_english` | spoken language-ID, P(English) (RQ1b leakage) | VoxLingua107 ECAPA | `genaid` |
 
 ## Why two environments
 
@@ -74,11 +75,20 @@ first run. The XLSR backbone for GenAID also downloads on first run.
 
 ### Wrapper scripts (place in `recipes/CommonAccent/`)
 
+> `GenAID/` is an **embedded git clone** (has its own `.git`), so files inside it
+> can't be tracked by the parent repo. The tracked source of truth lives in
+> `Evaluation/genaid_wrappers/` (all four); copy them into the clone's
+> `recipes/CommonAccent/` on a fresh checkout.
+
 Copy these from version control / this dissertation's records into the clone:
 
 - `predict_GenAID.py` — GenAID accent label + posteriors + embedding per wav.
 - `predict_commonaccent.py` — CommonAccent ECAPA secondary classifier.
 - `predict_speaker_embeddings.py` — ECAPA-TDNN speaker embeddings (#8).
+- `predict_lid.py` — VoxLingua107 ECAPA spoken-LID, P(English) per wav (#9,
+  RQ1b). Auto-downloads `speechbrain/lang-id-voxlingua107-ecapa` on first run;
+  locates the English class by ISO code `en`. Same librosa-load / `classify_batch`
+  pattern as the other wrappers (patch #3 below).
 
 ### Required patches to the SpeechBrain fork
 
