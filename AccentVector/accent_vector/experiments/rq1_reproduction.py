@@ -1,4 +1,4 @@
-"""[E1.1-1.4] RQ1 -- cross-backbone reproduction, incl. RQ1b language leakage.
+"""[E1.1-1.4] RQ1 -- cross-backbone reproduction, incl. language leakage.
 
 Over one accent's alpha sweep, measure whether accent strength rises
 monotonically with alpha while speaker identity is retained, and instrument the
@@ -12,14 +12,14 @@ at high alpha.
                       into "southasian"), so a label match is uninformative --
                       the speaker-agnostic embedding cosine is the accent signal.
     identity        : speaker_similarity to the fixed native-language (L1) reference
-    leakage [RQ1b]  : wer vs the held-out English transcripts, and -- when a LID
+    leakage [RQ1]  : wer vs the held-out English transcripts, and -- when a LID
                       predictor is wired -- P(English) from a spoken-LID model
     leakage onset   : the alpha at which WER crosses a threshold (rising) or
                       P(English) drops below one (falling); compare to XTTS
 
 Monotonicity is summarised with Spearman rho over alpha (H1: rho > 0 for accent,
 ~0 for speaker similarity). Leakage onset makes the "how far can you scale before
-content leaves English" question a single comparable number (RQ1b).
+content leaves English" question a single comparable number (RQ1).
 
 The LID signal is an optional hook: if evaluation_functions exposes
 ``predict_lid_english(wavs) -> [{'p_english': float}, ...]`` (e.g. wrapping
@@ -103,7 +103,7 @@ def run(sweep_dir, transcripts, ref_wav, accent_refs, device, out_csv,
         if all(key in r for r in rows):
             summary[f"spearman_{key}"] = _spearman(alphas, [r[key] for r in rows])
 
-    # RQ1b: leakage onset -- how far the vector scales before content leaves English.
+    # RQ1: leakage onset -- how far the vector scales before content leaves English.
     if all("wer" in r for r in rows):
         summary["wer_leak_onset"] = shared.leakage_onset(
             alphas, [r["wer"] for r in rows], wer_leak_threshold, rising=True)
@@ -130,7 +130,7 @@ def main():
     p.add_argument("--accent-ref", help="dir of natural target-accent clips (cs_accent)")
     p.add_argument("--device", default="cpu")
     p.add_argument("--lid", action="store_true",
-                   help="measure P(English) per alpha via ef.predict_lid_english (RQ1b)")
+                   help="measure P(English) per alpha via ef.predict_lid_english (RQ1)")
     p.add_argument("--wer-leak-threshold", type=float, default=0.5,
                    help="WER above which content is treated as leaked (rising onset)")
     p.add_argument("--lid-leak-threshold", type=float, default=0.5,

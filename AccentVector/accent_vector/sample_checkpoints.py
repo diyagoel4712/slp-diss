@@ -1,4 +1,4 @@
-"""[RQ6 companion] Listen to the model as the accent forms: synthesise a FIXED
+"""[RQ2 companion] Listen to the model as the accent forms: synthesise a FIXED
 (ref clip, gen text) at every LoRA snapshot so you can scrub through step_<n>.wav
 and hear the accent emerge (early vs late clips differ audibly).
 

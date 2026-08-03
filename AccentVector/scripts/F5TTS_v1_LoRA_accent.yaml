@@ -65,7 +65,7 @@ ckpts:
   wandb_run_name: ${model.name}_${datasets.name}
   log_samples: True       # dump a gen/ref wav each save_per_updates
   save_per_updates: 500   # samples + valid-eval + model_last cadence
-  snapshot_per_updates: 100  # cheap LoRA-only snapshot cadence -> RQ6 trajectory granularity
+  snapshot_per_updates: 100  # cheap LoRA-only snapshot cadence -> RQ2 trajectory granularity
   keep_last_n_checkpoints: -1  # keep all (snapshots are tiny; full model_last is overwritten)
   last_per_updates: 500
   save_dir: ${hydra:run.dir}

@@ -3,10 +3,10 @@
     load_eval                     eval-suite bridge      (rq1, rq2, rq3)
     alpha_dirs, wavs_in           synthesis-grid IO      (rq1, rq2, rq3)
     cosine_matrix, classical_mds  vector geometry        (rq2, viz_temporal)
-    leakage_onset                 threshold crossing     (rq1, rq6_temporal)
+    leakage_onset                 threshold crossing     (rq1, rq2_temporal)
 
 Single-use helpers live in the RQ module that uses them: the vector flattener and
-Mantel test in rq2_geometry; the voicing-rhythm math and gap-closure in
+Mantel test in rq5_geometry; the voicing-rhythm math and gap-closure in
 rq3_decomposition; utt_index in rq1_reproduction.
 """
 
@@ -46,7 +46,7 @@ def wavs_in(d):
     return sorted(str(p) for p in Path(d).glob("*.wav"))
 
 
-# --- vector geometry (RQ2 map + RQ6 trajectory viz) -------------------------
+# --- vector geometry (RQ5 map + RQ2 trajectory viz) -------------------------
 def cosine_matrix(vectors):
     """vectors: dict name -> 1-D array. Returns (names, NxN cosine matrix)."""
     names = list(vectors)
@@ -75,13 +75,13 @@ def classical_mds(sim, n_components=2):
     return vecs * np.sqrt(np.clip(vals, 0, None))
 
 
-# --- threshold crossing over a swept series (RQ1b onset, RQ6 convergence) ----
+# --- threshold crossing over a swept series (RQ1 onset, RQ2 convergence) ----
 def leakage_onset(alphas, signal, threshold, rising=True):
     """Linearly-interpolated alpha at which a signal first crosses a threshold.
 
-    Reused for two "where does it cross" questions: RQ1b language-leakage onset
+    Reused for two "where does it cross" questions: RQ1 language-leakage onset
     (how far the vector scales before content leaves the base language /
-    intelligibility collapses) and RQ6 direction-convergence step.
+    intelligibility collapses) and RQ2 direction-convergence step.
 
     rising=True  : onset where the signal climbs past threshold (e.g. WER).
     rising=False : onset where the signal drops below threshold (e.g. P(English)).

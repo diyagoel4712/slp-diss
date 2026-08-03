@@ -41,8 +41,8 @@ set up in `Preliminary_test_results/f5-tts`). Two consequences:
      vector *is* the LoRA branch, scaled natively by `lora_alpha` (no merge).
      The whole analysis pipeline runs on it — `infer_accent --lora` (and
      `grid --lora`) build the base+LoRA model **once** and rescale the branch per
-     alpha in place (`accent_vector/lora_model.py`), feeding RQ1–RQ3, plus the RQ6
-     trajectory tooling (`sample_checkpoints.py`, `rq6_temporal --lora`,
+     alpha in place (`accent_vector/lora_model.py`), feeding RQ1–RQ3, plus the RQ2
+     trajectory tooling (`sample_checkpoints.py`, `rq2_temporal --lora`,
      `viz_temporal`). This is the paper-matching, default track.
    - **Full fine-tune** (`finetune.sh`, `F5TTS_v1_Base`): the path
      Expressive-Vectors exercises end-to-end; `extract_vector` diffs the full
@@ -167,10 +167,10 @@ accent_vector/
   extract_vector.py    task-vector extract (Eq. 1-3) + arithmetic (Eq. 4-6)
   infer_accent.py      alpha-sweep / single-ckpt inference, fixed native-L1 ref
   evaluate.py          scores a sweep via the Evaluation/ eval suite
-  sample_checkpoints.py  RQ6: synthesise a fixed prompt at every LoRA snapshot
+  sample_checkpoints.py  RQ2: synthesise a fixed prompt at every LoRA snapshot
   experiments/         dissertation RQ harness (see EXPERIMENTS.md);
-                       grid, rq1_reproduction, rq2_geometry, rq3_decomposition,
-                       rq3_layers, rq6_temporal, viz_temporal, shared
+                       grid, rq1_reproduction, rq5_geometry, rq3_decomposition,
+                       rq3_layers, rq2_temporal, viz_temporal, shared
 scripts/               finetune(.sh) / finetune_lora(.sh) / extract / infer /
                        evaluate wrappers
 transcripts/           held-out English eval transcripts (10 CMU ARCTIC sents)

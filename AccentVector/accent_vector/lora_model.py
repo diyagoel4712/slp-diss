@@ -108,7 +108,7 @@ def overlay_lora(model, lora_state):
     """Overlay a LoRA accent vector onto the (already base-loaded) model in place.
 
     Keys shared with a previous overlay are replaced, so this can be called
-    repeatedly to swap in successive snapshots (the RQ6 trajectory).
+    repeatedly to swap in successive snapshots (the RQ2 trajectory).
     """
     model.load_state_dict(lora_state, strict=False)
 

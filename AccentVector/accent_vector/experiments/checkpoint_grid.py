@@ -1,11 +1,11 @@
-"""[RQ1 x RQ6 -- behavioural trajectory, GPU] Run the alpha sweep at SEVERAL
+"""[RQ1 x RQ2 -- behavioural trajectory, GPU] Run the alpha sweep at SEVERAL
 training checkpoints of one accent, so the downstream metrics can be compared at
 matched alpha across training time (25k vs 45k vs ...).
 
 This is the synthesis half of the "does the accent arrive before the language?"
-question. ``rq6_temporal`` tracks the vector in WEIGHT space (||tau_t||, direction);
+question. ``rq2_temporal`` tracks the vector in WEIGHT space (||tau_t||, direction);
 this produces the OUTPUT the model actually generates at each checkpoint, which
-``rq1_reproduction`` (per checkpoint) then scores and ``rq6_behavioural`` compares.
+``rq1_reproduction`` (per checkpoint) then scores and ``rq2_behavioural`` compares.
 
 For each requested step it resolves that step's LoRA accent vector and runs the
 native LoRA alpha sweep (reusing ``infer_accent.synthesize_lora_sweep``) into
@@ -88,7 +88,7 @@ def run(pretrained, config, vocab, vectors, ref_audio, ref_text, transcripts,
 
 
 def main():
-    p = argparse.ArgumentParser(description="Alpha sweep across training checkpoints (RQ1 x RQ6)")
+    p = argparse.ArgumentParser(description="Alpha sweep across training checkpoints (RQ1 x RQ2)")
     p.add_argument("--pretrained", required=True, help="base checkpoint (theta_pre)")
     p.add_argument("--config", required=True, help="training run config.yaml")
     p.add_argument("--vocab", required=True, help="training run vocab.txt")

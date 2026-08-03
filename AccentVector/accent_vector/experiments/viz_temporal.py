@@ -1,4 +1,4 @@
-"""[RQ6] Combined dashboard *video* of the accent vector forming during fine-tuning.
+"""[RQ2] Combined dashboard *video* of the accent vector forming during fine-tuning.
 
 Reads the LoRA snapshots (lora_<step>.pt) written during training and animates three
 synchronised panels, one frame per snapshot:
@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 
 from accent_vector.experiments import shared
-from accent_vector.experiments.rq6_temporal import collect_checkpoints, _vector_1d_lora
+from accent_vector.experiments.rq2_temporal import collect_checkpoints, _vector_1d_lora
 
 
 def _load_trajectory(ckpt_dir, include, exclude):
@@ -122,7 +122,7 @@ def animate(ckpt_dir, out, threshold=0.95, include=None, exclude=None, fps=8):
 
 
 def main():
-    p = argparse.ArgumentParser(description="RQ6 accent-vector trajectory dashboard video")
+    p = argparse.ArgumentParser(description="RQ2 accent-vector trajectory dashboard video")
     p.add_argument("--ckpt-dir", required=True, help="dir of lora_<step>.pt snapshots")
     p.add_argument("--out", required=True, help="output .mp4 (falls back to .gif)")
     p.add_argument("--threshold", type=float, default=0.95, help="direction-convergence line")

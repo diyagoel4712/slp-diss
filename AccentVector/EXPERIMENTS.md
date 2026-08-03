@@ -55,22 +55,21 @@ trees `results/<accent>/{l1,native}/`; via the Eddie wrapper set `REF_KIND=l1|na
 |----|----|--------|--------|------------------------|
 | E1.1 | RQ1 | `rq1_reproduction` | `rq1.csv` | accent (`accent_cs`) ↑ monotonic with α (Spearman>0), spk-sim flat/high |
 | E1.2 | RQ1 | `rq1_reproduction` (wer col) | `rq1.csv` | WER rises with α faster than paper's XTTS (leakage) |
-| E1.3 | RQ1b | `rq1_reproduction --lid` (eng_lid col) | `rq1.csv` | P(English) falls with α — direct language drift, distinct from accent |
-| E1.4 | RQ1b | `rq1_reproduction` (leak-onset in footer) | `rq1.csv` | leakage-onset α lower on F5 than XTTS (missing language anchor) |
+| E1.3 | RQ1 | `rq1_reproduction --lid` (eng_lid col) | `rq1.csv` | P(English) falls with α — direct language drift, distinct from accent |
+| E1.4 | RQ1 | `rq1_reproduction` (leak-onset in footer) | `rq1.csv` | leakage-onset α lower on F5 than XTTS (missing language anchor) |
 | E1.5 | RQ1 | `rq1_reproduction` on **both** reference passes (`{l1,native}/`) | `rq1.csv` ×2 | accent ↑ with α under the **neutral** reference ⇒ vector adds accent independent of the reference; flat/leaky ⇒ L1-condition accent was cloning (valid negative result) |
-| E2.1 | RQ2 | `rq2_geometry` | `weight_space_cosine.csv`, `..._mds.csv` | accents cluster by family in MDS |
-| E2.2 | RQ2 | `rq2_geometry` (--synth) | `output_space_cosine.csv`, `rsa_mantel.txt` | Mantel r>0, p<0.05 but r<1 (imperfect) |
-| E2.3 | RQ2 | `rq2_geometry` (within- vs cross-English) | matrices | corpus contributes measurable distance |
+| E2.1 | RQ2 | `rq2_temporal` | `temporal.csv` | `cos(τ_t, τ_final)` converges before magnitude (direction learnable early) |
+| E2.2 | RQ2×RQ1 | `checkpoint_grid` → `rq1_reproduction` per step → `rq2_behavioural` | `by_step_summary.csv`, `*_by_step_alpha.csv`, `matched_alpha_trends.csv` | accent (`accent_cs`) saturates with step at low-mid α while `wer` rises and `wer_leak_onset` **falls** with step ⇒ accent learned before language; earlier checkpoint + moderate α is the fluent-accented sweet spot |
 | E3.1 | RQ3 | `rq3_decomposition` (seg cols) | `rq3.csv` | PPG-KL-to-natural falls with α |
 | E3.2 | RQ3 | `rq3_decomposition` (supra cols) | `rq3.csv` | F0/rhythm move little toward natural |
 | E3.3 | RQ3 | `rq3_decomposition` (closure) | `rq3.csv` | seg_closure ≫ supra_closure_mean, widest for distant accent |
 | E3.4 | RQ3 | `rq3_layers` | `rq3_layers.csv` | accent energy concentrates in identifiable modules/depth |
 | E4.1 | RQ4* | `infer_accent --include-layers/--exclude-layers` (LoRA-native mask) or `extract_vector compose --include` (merged) → `rq3_decomposition` | `rq3.csv` | scaling only accent layers (e.g. `--exclude-layers text_embed input_embed`) keeps English fluent (wer flat) while raising accent; up-weighting prosody layers raises supra_closure |
-| E4.2 | RQ4* | reference retrieval (stub) + `rq3` | — | matched reference raises supra transfer |
-| E6.1 | RQ6 | `rq6_temporal` | `temporal.csv` | `cos(τ_t, τ_final)` converges before magnitude (direction learnable early) |
-| E6.2 | RQ6×RQ1 | `checkpoint_grid` → `rq1_reproduction` per step → `rq6_behavioural` | `by_step_summary.csv`, `*_by_step_alpha.csv`, `matched_alpha_trends.csv` | accent (`accent_cs`) saturates with step at low-mid α while `wer` rises and `wer_leak_onset` **falls** with step ⇒ accent learned before language; earlier checkpoint + moderate α is the fluent-accented sweet spot |
+| E5.1 | RQ5 | `rq5_geometry` | `weight_space_cosine.csv`, `..._mds.csv` | accents cluster by family in MDS |
+| E5.2 | RQ5 | `rq5_geometry` (--synth) | `output_space_cosine.csv`, `rsa_mantel.txt` | Mantel r>0, p<0.05 but r<1 (imperfect) |
+| E5.3 | RQ5 | `rq5_geometry` (within- vs cross-English) | matrices | corpus contributes measurable distance |
 
-`*` RQ4 is the stretch tier. **E6.1 is Tier-1 only** (optimisation trajectory,
+`*` RQ4 is the stretch tier. **E2.1 is Tier-1 only** (optimisation trajectory,
 near-free): needs intermediate `model_<step>.pt` checkpoints saved during A0.
 The data-efficiency variant (Tier 2/3: separate LoRAs on data fractions with
 error bounds) is out of scope — step ≠ data amount.
@@ -83,12 +82,11 @@ error bounds) is out of scope — step ≠ data amount.
   `recipes/CommonAccent/predict_lid.py` wrapper and returns P(English) per clip →
   activates the `eng_lid` column and the LID-based leakage onset. WER still
   provides a parallel (accent-confounded) leakage signal.
-- **XTTS token ablation** (RQ1b clean isolation) — out of scope here (needs XTTS
+- **XTTS token ablation** (RQ1 clean isolation) — out of scope here (needs XTTS
   re-stood-up); the F5-vs-XTTS onset gap confounds backbone with the missing
-  language-ID token, so report it as evidence, not proof. See PROPOSAL.md RQ1b.
+  language-ID token, so report it as evidence, not proof. See PROPOSAL.md RQ1.
 - **Forced-alignment rhythm** (%V, ΔC, nPVI) — `rq3` ships a voicing-based proxy
   from `extract_f0`; swap in MFA vowel/consonant intervals for the rigorous form.
-- **Reference retrieval** (E4.2) — adapt `Evaluation/select_utterances.py`.
 
 ## Typical run order
 
@@ -109,12 +107,12 @@ python -m accent_vector.experiments.aggregate --accent-dir results/indian --csv-
 
 python -m accent_vector.experiments.rq3_layers --vector vectors/indian.pt \
     --out-csv results/indian/rq3_layers.csv                                            # E3.4 (vector-only)
-python -m accent_vector.experiments.rq2_geometry --vector indian=vectors/indian.pt \
+python -m accent_vector.experiments.rq5_geometry --vector indian=vectors/indian.pt \
     --vector spanish=vectors/spanish.pt --synth indian=results/indian/p1/alpha_1.0 \
-    --synth spanish=results/spanish/s1/alpha_1.0 --out-dir results/geometry            # E2
-python -m accent_vector.experiments.rq6_temporal --lora \
+    --synth spanish=results/spanish/s1/alpha_1.0 --out-dir results/geometry            # E5
+python -m accent_vector.experiments.rq2_temporal --lora \
     --ckpt-dir exps/F5TTS_v1_LoRA_indian/<run>/ckpts/snapshots \
-    --out-csv results/indian/temporal.csv                                             # E6.1
+    --out-csv results/indian/temporal.csv                                             # E2.1
 ```
 
 ### Layer-masked accent (E4.1) — "accent without the language"
@@ -136,7 +134,7 @@ python -m accent_vector.infer_accent --lora \
 # then score results/dutch/masked with rq1/rq3 as usual and compare to the unmasked sweep
 ```
 
-### Checkpoint × alpha comparison (E6.2) — accent-vs-language over training
+### Checkpoint × alpha comparison (E2.2) — accent-vs-language over training
 
 Needs `snapshot_per_updates` snapshots (or full `model_<step>.pt`) from A0. Render
 each checkpoint's sweep, score each, then collate at matched α — ideally against the
@@ -158,6 +156,6 @@ for s in results/dutch/native/by_step/step_*/; do
     --transcripts transcripts/eval_transcripts.txt --ref-wav refs/native_ga.wav \
     --accent-ref natural/dutch --lid --out-csv "$s/rq1.csv"
 done
-python -m accent_vector.experiments.rq6_behavioural \
+python -m accent_vector.experiments.rq2_behavioural \
     --by-step-dir results/dutch/native/by_step --out-dir results/dutch/native/trajectory
 ```

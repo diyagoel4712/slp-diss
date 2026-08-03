@@ -1,6 +1,6 @@
 """Completeness gate for a synthesis tree: flag any alpha_<a>/ dir whose utt####.wav
 set doesn't match the expected transcript count -- catches a failed/partial task (e.g. a
-crashed shard) BEFORE it silently biases rq1/rq3/rq6 (which just score whatever wavs exist).
+crashed shard) BEFORE it silently biases rq1/rq2/rq3 (which just score whatever wavs exist).
 
 Expected count per alpha dir:
   --expected N         use N for every dir (uniform transcript set), OR

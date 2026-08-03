@@ -1,11 +1,11 @@
 #!/bin/bash
-# Dutch CHECKPOINT x alpha inference grid on Eddie (feeds RQ6-behavioural + RQ1).
+# Dutch CHECKPOINT x alpha inference grid on Eddie (feeds RQ2-behavioural + RQ1).
 #
 # Grid = N_CHECKPOINTS evenly-spaced training steps (up to LAST_STEP=73400)
 #        x REF_KINDS {l1 native} x SPEAKERS {m f} x transcript-SHARDS,
 # each an alpha sweep {0 0.25 0.5 0.75 1.0} ->
 #   results/dutch/<ref_kind>/<speaker>/step_<step>/alpha_<a>/utt####.wav
-# so rq1_reproduction (per step) + rq6_behavioural compare matched-alpha across training.
+# so rq1_reproduction (per step) + rq2_behavioural compare matched-alpha across training.
 #
 # Dutch assets (all local in the repo): L1 = prompts/dutch/dutch_{m,f}.{wav,_ref.txt};
 # GAE = prompts/GAE/gae_{m,f}.{wav,txt}; per-speaker sentences = transcripts/dutch/dutch_{m,f}_eval.txt.

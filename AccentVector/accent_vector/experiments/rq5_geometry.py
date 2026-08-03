@@ -1,4 +1,4 @@
-"""[E2.1-2.3] RQ2 -- geometry of the accent-vector space.
+"""[E5.1-5.3] RQ5 -- geometry of the accent-vector space.
 
 Builds two accent-similarity matrices and compares them:
 
@@ -8,7 +8,7 @@ Builds two accent-similarity matrices and compares them:
 and runs a Mantel (RSA) test between them (H2: positive but imperfect). A 2-D
 classical-MDS embedding of the weight-space matrix gives the accent map.
 
-    python -m accent_vector.experiments.rq2_geometry \
+    python -m accent_vector.experiments.rq5_geometry \
         --vector british=vectors/british.pt --vector spanish=vectors/spanish.pt \
         --synth british=results/british/alpha_1.0 --synth spanish=results/spanish/alpha_1.0 \
         --out-dir results/geometry
@@ -53,7 +53,7 @@ def load_vector_flat(vector_path, include=None, exclude=None):
 def mantel_test(A, B, n_perm=9999, seed=0):
     """Correlate two symmetric matrices over their upper triangle, with a row/col
     permutation test. Returns (pearson_r, p_value). Used for RSA between the
-    weight-space and output-space accent-similarity matrices (RQ2)."""
+    weight-space and output-space accent-similarity matrices (RQ5)."""
     A, B = np.asarray(A, float), np.asarray(B, float)
     iu = np.triu_indices_from(A, k=1)
     a = A[iu]
@@ -135,7 +135,7 @@ def run(vectors, synth_dirs, out_dir, include, exclude):
 
 
 def main():
-    p = argparse.ArgumentParser(description="RQ2 accent-vector geometry")
+    p = argparse.ArgumentParser(description="RQ5 accent-vector geometry")
     p.add_argument("--vector", action="append", default=[], required=True,
                    help="name=path (repeatable)")
     p.add_argument("--synth", action="append", default=[],

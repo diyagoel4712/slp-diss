@@ -1,4 +1,4 @@
-"""[RQ6 / Tier 1] Temporal trajectory of the accent vector during fine-tuning.
+"""[RQ2 / Tier 1] Temporal trajectory of the accent vector during fine-tuning.
 
 For a sequence of fine-tuning checkpoints theta_t, form tau_t = theta_t - theta_pre
 and track -- at near-zero extra cost, pure CPU vector math over checkpoints you
@@ -23,7 +23,7 @@ Tip: pass ``--include ema_model_state_dict`` to track the weights inference
 actually uses; optimizer moments are dropped by default (they aren't part of the
 accent vector and would pollute magnitude/direction).
 
-    python -m accent_vector.experiments.rq6_temporal \
+    python -m accent_vector.experiments.rq2_temporal \
         --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt \
         --ckpt-dir ckpts/british --include ema_model_state_dict \
         --out-csv results/british/temporal.csv
@@ -31,7 +31,7 @@ accent vector and would pollute magnitude/direction).
 For a LoRA fine-tune the accent vector IS the LoRA weights, so pass ``--lora`` and
 point ``--ckpt-dir`` at the snapshots dir (no ``--pretrained`` needed):
 
-    python -m accent_vector.experiments.rq6_temporal --lora \
+    python -m accent_vector.experiments.rq2_temporal --lora \
         --ckpt-dir exps/F5TTS_v1_LoRA_british/<run>/ckpts/snapshots \
         --out-csv results/british/temporal.csv
 """
@@ -161,7 +161,7 @@ def run(pretrained, ckpt_dir, out_csv, threshold=0.95, include=None, exclude=Non
 
 
 def main():
-    p = argparse.ArgumentParser(description="RQ6/Tier1 accent-vector fine-tuning trajectory")
+    p = argparse.ArgumentParser(description="RQ2/Tier1 accent-vector fine-tuning trajectory")
     p.add_argument("--lora", action="store_true",
                    help="LoRA mode: build tau_t from lora_<step>.pt snapshots directly "
                         "(tau = theta_LoRA, zero baseline); --pretrained not needed")

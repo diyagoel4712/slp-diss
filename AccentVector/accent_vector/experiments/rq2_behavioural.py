@@ -1,8 +1,8 @@
-"""[RQ1 x RQ6 -- behavioural trajectory analysis, CPU] Compare the model's OUTPUT
+"""[RQ1 x RQ2 -- behavioural trajectory analysis, CPU] Compare the model's OUTPUT
 metrics across training checkpoints at MATCHED alpha -- the "does the accent arrive
 before the language?" question answered in output space.
 
-``rq6_temporal`` tracks the vector in WEIGHT space (||tau_t||, direction).
+``rq2_temporal`` tracks the vector in WEIGHT space (||tau_t||, direction).
 ``checkpoint_grid`` renders each checkpoint's alpha sweep and ``rq1_reproduction``
 scores each into ``<by-step-dir>/step_<step>/rq1.csv``. This module collates those
 per-checkpoint CSVs (matched on the ``alpha`` column) into:
@@ -21,13 +21,13 @@ How to read it for the core question:
   * accent (accent_cs) rising with STEP at low-mid alpha, then flat
     => accent is basically learned; more steps add little accent.
   * wer rising with STEP at fixed alpha, and wer_leak_onset FALLING with step
-    => more training makes English *less* fluent / leaks sooner (RQ1b). If accent
+    => more training makes English *less* fluent / leaks sooner (RQ1). If accent
     saturates early while leakage keeps worsening, the accent needs far fewer steps
     than the language -- and an earlier checkpoint at moderate alpha is the sweet
     spot. (Metric-agnostic: point --csv-name at rq3.csv to trend the segmental/
     suprasegmental columns across training instead.)
 
-    python -m accent_vector.experiments.rq6_behavioural \
+    python -m accent_vector.experiments.rq2_behavioural \
         --by-step-dir results/dutch/native/by_step --csv-name rq1.csv \
         --out-dir results/dutch/native/trajectory
 """
@@ -106,7 +106,7 @@ def write_pivots(data, metrics, steps, alphas, out_dir):
 
 def write_matched_alpha_trends(data, metrics, steps, alphas, out_dir):
     """At each fixed alpha, Spearman(step, metric): does the metric climb or fall
-    as training proceeds *at that strength*? This is the RQ6 x RQ1 crossing --
+    as training proceeds *at that strength*? This is the RQ2 x RQ1 crossing --
     e.g. accent flat but wer rising = language learned later than accent."""
     with open(out_dir / "matched_alpha_trends.csv", "w", newline="") as f:
         w = csv.writer(f)
@@ -152,14 +152,14 @@ def run(by_step_dir, csv_name, out_dir, step_csvs=None, wer_thr=0.5):
     write_matched_alpha_trends(data, metrics, steps, alphas, out_dir)
     write_step_summary(data, metrics, steps, alphas, out_dir, wer_thr)
 
-    print(f"[rq6-behav] {len(steps)} checkpoints (steps {steps}); "
+    print(f"[rq2-behav] {len(steps)} checkpoints (steps {steps}); "
           f"alphas={alphas}; metrics={metrics}")
-    print(f"[rq6-behav] wrote trajectory_long.csv, {len(metrics)} *_by_step_alpha.csv, "
+    print(f"[rq2-behav] wrote trajectory_long.csv, {len(metrics)} *_by_step_alpha.csv, "
           f"matched_alpha_trends.csv, by_step_summary.csv -> {out_dir}")
 
 
 def main():
-    p = argparse.ArgumentParser(description="Compare checkpoints at matched alpha (RQ1 x RQ6)")
+    p = argparse.ArgumentParser(description="Compare checkpoints at matched alpha (RQ1 x RQ2)")
     p.add_argument("--by-step-dir", help="dir of step_<step>/ subdirs (auto-discovers <csv-name>)")
     p.add_argument("--csv-name", default="rq1.csv", help="per-checkpoint metric CSV to collate")
     p.add_argument("--csv", action="append", default=[],

@@ -75,35 +75,42 @@ reference text, generation text), with a `char`/`pinyin` tokenizer. Consequences
 
 ## Research questions & hypotheses
 
-- **RQ1 — Cross-backbone generalisation.** Does task-vector accent control
-  transfer from XTTS (autoregressive codec) to **F5-TTS (flow-matching)**, which
-  has **no language-ID token**? *H1:* mechanism transfers (α-monotonic accent,
-  speaker retained). Tested by the accent-strength-vs-α monotonicity + speaker
-  retention — the shape of the paper's Fig. 3 reproduced on a new backbone.
-  Because a non-factorised backbone clones accent straight from the reference, "does
-  α=0 sound accented" is *not* the question (it does, trivially, under an L1 reference);
-  the test is the **α-curve shape**, read jointly across the two reference conditions
-  (Method §3): does accent rise with α under the **neutral-reference** control (vector
-  doing real, reference-independent work) or only under the L1 reference (accent was
-  cloning)? A flat/leaky neutral-reference curve is a valid *negative* transfer result —
-  the sharpest statement that on flow-matching F5 the vector is largely redundant to
-  cloning. The seed signal is already visible in a British smoke test (`results/british/`,
-  n=4): accent-ID, WER and UTMOS all *degrade* as α→1.
-- **RQ1b — Language leakage and the language-ID anchor.** Because F5 has no
-  language-ID token to hold content in English, does content drift toward the
-  target *language* (not just accent) sooner than on XTTS? *H1b:* leakage sets in
-  at lower α on F5. Measured by (i) WER vs α, (ii) P(English) from a spoken-LID
-  model vs α — the direct drift signal, distinct from accent — and (iii) a single
-  **leakage-onset α** (where WER crosses / P(English) drops below a threshold),
-  compared to the paper's XTTS numbers. WER alone conflates drift with the ASR's
-  accent penalty, so **relative WER** (RQ5) and the LID signal disambiguate.
-  *Confound (stated as a limitation):* F5-vs-XTTS varies backbone **and** token
-  together; the clean isolation — ablating the token *within* XTTS — needs XTTS
-  re-stood-up and is out of scope, so the onset gap is evidence, not proof.
-- **RQ2 — Geometry.** Do vectors cluster by linguistic family, and how much is
-  accent vs training-corpus confound? *H2:* weight-space similarity partially
-  recovers accent relatedness; RSA vs output-space (GenAID) is positive but
-  imperfect.
+- **RQ1 — Cross-backbone generalisation (incl. language leakage).** Does
+  task-vector accent control transfer from XTTS (autoregressive codec) to
+  **F5-TTS (flow-matching)**, which has **no language-ID token**? *H1:* the
+  mechanism transfers (α-monotonic accent, speaker retained) — **but**, lacking the
+  language-ID anchor, content leakage toward the target *language* sets in at lower α
+  than on XTTS. Tested by the accent-strength-vs-α monotonicity + speaker retention —
+  the shape of the paper's Fig. 3 reproduced on a new backbone. Because a non-factorised
+  backbone clones accent straight from the reference, "does α=0 sound accented" is *not*
+  the question (it does, trivially, under an L1 reference); the test is the **α-curve
+  shape**, read jointly across the two reference conditions (Method §3): does accent rise
+  with α under the **neutral-reference** control (vector doing real, reference-independent
+  work) or only under the L1 reference (accent was cloning)? A flat/leaky neutral-reference
+  curve is a valid *negative* transfer result — the sharpest statement that on flow-matching
+  F5 the vector is largely redundant to cloning. The seed signal is already visible in a
+  British smoke test (`results/british/`, n=4): accent-ID, WER and UTMOS all *degrade* as α→1.
+
+  *Language leakage (the language-ID anchor).* Because F5 has no language-ID token to hold
+  content in English, does content drift toward the target *language* (not just accent)
+  sooner than on XTTS? Measured by (i) WER vs α, (ii) P(English) from a spoken-LID model vs
+  α — the direct drift signal, distinct from accent — and (iii) a single **leakage-onset α**
+  (where WER crosses / P(English) drops below a threshold), compared to the paper's XTTS
+  numbers. WER alone conflates drift with the ASR's accent penalty, so **relative WER** (see
+  Limitations) and the LID signal disambiguate. *Confound (stated as a limitation):* F5-vs-XTTS
+  varies backbone **and** token together; the clean isolation — ablating the token *within*
+  XTTS — needs XTTS re-stood-up and is out of scope, so the onset gap is evidence, not proof.
+- **RQ2 — Fine-tuning trajectory.** How does the accent vector form over training?
+  Track `‖τ_t‖` and `cos(τ_t, τ_final)` across checkpoints (weight space), and
+  compare the α-sweep at matched α across checkpoints (output space). *H2:* the accent
+  **direction** stabilises well before magnitude — so the direction is learnable from
+  little optimisation and α supplies the remaining intensity — and in output space
+  accent saturates with training earlier than language leakage worsens (an earlier
+  checkpoint at moderate α is the fluent-accented sweet spot). This is the
+  *optimisation* trajectory (near-free: CPU vector math over checkpoints already saved,
+  plus one synthesis grid); the *data-efficiency* question (separate LoRAs on data
+  fractions, with error bounds) is Tier 2/3 and **out of scope** — step ≠ data amount,
+  since F5 fine-tunes many epochs over one corpus.
 - **RQ3 — Segmental vs suprasegmental (core).** As α increases, do segmental
   (phone) and suprasegmental (F0/rhythm/tempo) features both move toward the
   natural target? *H3:* the vector is **segmental-dominated**, and the gap is
@@ -112,23 +119,13 @@ reference text, generation text), with a `char`/`pinyin` tokenizer. Consequences
   accented says nothing about *which* structure carries it. The decomposition (segmental
   `ppg_kl` vs suprasegmental F0/nPVI/articulation-rate gap-closure) is precisely what an
   ear cannot separate, and remains the core contribution regardless of the RQ1 outcome.
-- **RQ4 — Intervention (stretch).** Can layer-targeted scaling or
-  prosody-matched reference retrieval improve suprasegmental transfer? *H4:*
-  yes, without collapsing speaker similarity.
-- **RQ5 — Evaluation bias.** Where does bias enter, and does a fairer protocol
-  (relative WER, gender-disaggregated, familiarity-baselined) change conclusions?
-  The gap between *ear-perceived* accent (subjectively "convincing") and *measured*
-  accent (best-case only ~0.73 accent-embedding / ~26% accent-ID in our benchmark) is
-  itself an evaluation-bias data point: perceptual conviction overstates measured accent
-  fidelity, motivating the metric-first protocol used throughout.
-- **RQ6 — Fine-tuning trajectory (optional, Tier 1).** How does the accent vector
-  form over training? Track `‖τ_t‖` and `cos(τ_t, τ_final)` across checkpoints.
-  *H6:* the accent **direction** stabilises well before magnitude — so the
-  direction is learnable from little optimisation and α supplies the remaining
-  intensity. This is the *optimisation* trajectory (near-free: CPU vector math
-  over checkpoints already saved); the *data-efficiency* question (separate LoRAs
-  on data fractions, with error bounds) is Tier 2/3 and **out of scope** — step ≠
-  data amount, since F5 fine-tunes many epochs over one corpus.
+- **RQ4 — Intervention (stretch).** Can layer-targeted scaling of the vector
+  (up-weighting prosody-carrying layers / excluding the content-language path)
+  improve suprasegmental transfer? *H4:* yes, without collapsing speaker similarity.
+- **RQ5 — Linguistic alignment (geometry).** Do vectors cluster by linguistic
+  family, and how much is accent vs training-corpus confound? *H5:* weight-space
+  similarity partially recovers accent relatedness; RSA vs output-space (GenAID) is
+  positive but imperfect.
 
 ## Method
 
@@ -150,18 +147,31 @@ Mandarin) as the H3 stress test. Measurement reuses
 |----|-------|-----------|
 | 1 | GPU setup, reproduce Phase A (British) end-to-end | working port; α-sweep |
 | 2 | Validate RQ1 (α-monotonicity, speaker retention); eval harness | **go/no-go gate** |
-| 3 | Train Spanish + Vietnamese vectors; start geometry (RQ2) | vector library; first accent map |
-| 4 | Add distant accent; finalise RQ1/RQ2 | RQ1+RQ2 results; methods draft |
+| 3 | Train Spanish + Vietnamese vectors; trajectory mapping (RQ2) | vector library; trajectory curves |
+| 4 | Add distant accent; geometry (RQ5); finalise RQ1 | RQ1+RQ2+RQ5 results; methods draft |
 | 5 | **RQ3 decomposition** (segmental vs suprasegmental across α) | core figures |
 | 6 | Layer localisation; interpret failure mode | RQ3 conclusion; analysis draft |
-| 7 | Stretch RQ4 intervention + RQ5 bias audit/flowchart | intervention or negative result; bias chapter |
+| 7 | Stretch RQ4 intervention + bias-audit limitation | intervention or negative result; limitations chapter |
 | 8 | Consolidate, buffer, polish | submitted dissertation |
 
 ## Scope tiers
 
-- **Minimum viable:** RQ1 reproduction + RQ3 decomposition (≥3 accents) + RQ5 audit.
-- **Target:** + RQ2 geometry/RSA + the distant accent.
+- **Minimum viable:** RQ1 reproduction + RQ2 trajectory + RQ3 decomposition (≥3 accents) + the bias-audit limitation.
+- **Target:** + RQ5 geometry/RSA + the distant accent.
 - **Stretch:** RQ4 intervention (a negative result is a valid finding).
+
+## Evaluation bias (discussion / limitations)
+
+The evaluation instruments are themselves phoneme- and English-biased (VoxProfile,
+Whisper, UTMOS), so a recurring limitation — threaded through the results rather than
+posed as a standalone RQ — is *where evaluation bias enters and whether a fairer
+protocol changes the conclusions*: relative (not absolute) WER, gender-disaggregated
+scores, and familiarity-baselined accent similarity. A concrete instance: the gap
+between *ear-perceived* accent (subjectively "convincing") and *measured* accent
+(best-case only ~0.73 accent-embedding / ~26% accent-ID in our benchmark) shows
+perceptual conviction overstates measured fidelity — which is why the study uses a
+metric-first protocol throughout and reports its instruments' bias as a limitation on
+every claim.
 
 ## Risks & mitigations
 
@@ -169,7 +179,7 @@ Mandarin) as the H3 stress test. Measurement reuses
 |------|-----------|
 | GPU-hours limited | LoRA (paper's own choice; ~8M params) |
 | Non-Latin script won't tokenise (Hindi) | romanise transcripts, or use Mandarin/Latin-only |
-| English-biased metrics | RQ5 makes this a *finding*; report relative/margin metrics |
+| English-biased metrics | treat as a limitation and *finding*; report relative/margin metrics |
 | Forced alignment fails on accented synthesis | fall back to voicing-based F0 rhythm proxy (already implemented) |
 | No native listeners for mixed-accent subjective eval | keep objective; frame subjective eval as future work |
 
