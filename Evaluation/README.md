@@ -21,7 +21,7 @@ synthesised speech against natural reference speech (VCTK).
 | 6 | `cs_accent` | accent-embedding cosine sim | GenAID embeddings | `genaid` |
 | 7 | `ppg_kl` | segmental pronunciation | wav2vec2 phoneme-CTC | `.conda` |
 | 8 | `speaker_similarity` | speaker identity (SECS) | ECAPA-TDNN | `genaid` |
-| 9 | `predict_lid_english` | spoken language-ID, P(English) (RQ1b leakage) | VoxLingua107 ECAPA | `genaid` |
+| 9 | `predict_lid_english` | spoken language-ID, P(English) (RQ1 leakage) | VoxLingua107 ECAPA | `genaid` |
 
 ## Why two environments
 
@@ -86,7 +86,7 @@ Copy these from version control / this dissertation's records into the clone:
 - `predict_commonaccent.py` — CommonAccent ECAPA secondary classifier.
 - `predict_speaker_embeddings.py` — ECAPA-TDNN speaker embeddings (#8).
 - `predict_lid.py` — VoxLingua107 ECAPA spoken-LID, P(English) per wav (#9,
-  RQ1b). Auto-downloads `speechbrain/lang-id-voxlingua107-ecapa` on first run;
+  RQ1 language leakage). Auto-downloads `speechbrain/lang-id-voxlingua107-ecapa` on first run;
   locates the English class by ISO code `en`. Same librosa-load / `classify_batch`
   pattern as the other wrappers (patch #3 below).
 

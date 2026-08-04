@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Spoken language-ID via SpeechBrain VoxLingua107 (ECAPA), for RQ1b language
+"""Spoken language-ID via SpeechBrain VoxLingua107 (ECAPA), for RQ1 language
 leakage: P(English) per clip, the direct "has content drifted out of English"
 signal that WER conflates with the ASR's accent penalty.
 
