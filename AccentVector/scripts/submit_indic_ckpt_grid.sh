@@ -1,5 +1,6 @@
 #!/bin/bash
-# Hindi / Bengali CHECKPOINT x alpha inference grid on Eddie (mirrors submit_dutch_ckpt_grid.sh).
+# Decoupled-accent (Hindi / Bengali / Arabic) CHECKPOINT x alpha inference grid on Eddie
+# (mirrors submit_dutch_ckpt_grid.sh). All use FLEURS L1 prompts + SAA ground truth.
 #
 # Grid = N_CHECKPOINTS evenly-spaced training steps (up to LAST_STEP; 0 = auto = max available)
 #        x REF_KINDS {l1 native} x SPEAKERS {m f} x transcript-SHARDS,
@@ -16,14 +17,16 @@
 # Point RUN_DIR at the accent's training run dir (has config.yaml, vocab.txt, ckpts/snapshots):
 #   ACCENT=hindi   RUN_DIR=/exports/.../F5TTS_v1_LoRA_hindi/<ts>   bash scripts/submit_indic_ckpt_grid.sh
 #   ACCENT=bengali RUN_DIR=/exports/.../F5TTS_v1_LoRA_bengali/<ts> bash scripts/submit_indic_ckpt_grid.sh
+#   ACCENT=arabic  RUN_DIR=/exports/.../F5TTS_v1_LoRA_arabic/<ts>  bash scripts/submit_indic_ckpt_grid.sh
 #   DRY_RUN=1 ...   (print the manifest, don't submit)
 #   N_CHECKPOINTS=8 SHARDS=2 MAX_CONCURRENT=12 ...
 set -uo pipefail
 
 ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
-ACCENT=${ACCENT:?set ACCENT=hindi or bengali}
+ACCENT=${ACCENT:?set ACCENT=hindi, bengali or arabic}
 
-case "$ACCENT" in hindi|bengali) ;; *) echo "ACCENT must be hindi or bengali (got '$ACCENT')" >&2; exit 1;; esac
+# Decoupled non-Latin accents (FLEURS L1 prompts + SAA GT), same grid pattern.
+case "$ACCENT" in hindi|bengali|arabic) ;; *) echo "ACCENT must be hindi, bengali or arabic (got '$ACCENT')" >&2; exit 1;; esac
 # L1 (native-language) reference basename for a given speaker (a function, not an assoc
 # array, so it runs on old bash too). Empty output => unknown; caller treats as missing.
 l1base() {
@@ -32,6 +35,9 @@ l1base() {
     hindi/f)   echo prompts/hindi/hi_F_02;;
     bengali/m) echo prompts/bengali/bn_M_01;;
     bengali/f) echo prompts/bengali/bn_F_02;;
+    # Arabic: set to the actual FLEURS ar_{M,F}_NN IDs chosen at prompt-prep time.
+    arabic/m)  echo prompts/arabic/ar_M_01;;
+    arabic/f)  echo prompts/arabic/ar_F_01;;
   esac
 }
 
