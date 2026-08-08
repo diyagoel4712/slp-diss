@@ -65,7 +65,8 @@ class Trainer:
         is_local_vocoder: bool = False,  # use local path vocoder
         local_vocoder_path: str = "",  # local vocoder path
         model_cfg_dict: dict = dict(),  # training config
-        use_lora: bool = False
+        use_lora: bool = False,
+        use_lang: bool = False,  # XTTS-style language-ID conditioning
     ):
         ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
 
@@ -164,6 +165,7 @@ class Trainer:
         self.duration_predictor = duration_predictor
 
         self.use_lora = use_lora
+        self.use_lang = use_lang
         parameter_with_grad = [p for p in model.parameters() if p.requires_grad]
         # weight_decay=0.0 makes AdamW mathematically equivalent to plain Adam, matching
         # the accent-vector paper (Lertpetchpun et al.: Adam, lr 3e-5). AdamW's default
@@ -385,7 +387,8 @@ class Trainer:
                 del checkpoint["ema_model_state_dict"][key]
 
         if self.is_main:
-            if self.use_lora:
+            # use_lang adds a lang_embed absent from base checkpoints -> load non-strictly too
+            if self.use_lora or self.use_lang:
                 self.ema_model.load_state_dict(checkpoint["ema_model_state_dict"], strict=False)
             else:
                 self.ema_model.load_state_dict(checkpoint["ema_model_state_dict"])
@@ -414,7 +417,7 @@ class Trainer:
                 for k, v in checkpoint["ema_model_state_dict"].items()
                 if k not in ["initted", "update", "step"]
             }
-            if self.use_lora:
+            if self.use_lora or self.use_lang:
                 self.accelerator.unwrap_model(self.model).load_state_dict(checkpoint["model_state_dict"], strict=False)
             else:
                 self.accelerator.unwrap_model(self.model).load_state_dict(checkpoint["model_state_dict"])
@@ -451,7 +454,7 @@ class Trainer:
         if self.batch_size_type == "sample":
             train_dataloader = DataLoader(
                 train_dataset,
-                collate_fn=lambda batch: collate_fn(batch, use_lora=self.use_lora),
+                collate_fn=lambda batch: collate_fn(batch, use_lora=self.use_lora, use_lang=self.use_lang),
                 num_workers=num_workers,
                 pin_memory=True,
                 persistent_workers=num_workers > 0,
@@ -462,7 +465,7 @@ class Trainer:
             if self.eval_valid:
                 dev_dataloader = DataLoader(
                     valid_dataset,
-                    collate_fn=lambda batch: collate_fn(batch, use_lora=self.use_lora),
+                    collate_fn=lambda batch: collate_fn(batch, use_lora=self.use_lora, use_lang=self.use_lang),
                     num_workers=num_workers,
                     pin_memory=True,
                     persistent_workers=num_workers > 0,
@@ -490,7 +493,7 @@ class Trainer:
                 )
             train_dataloader = DataLoader(
                 train_dataset,
-                collate_fn=lambda batch: collate_fn(batch, use_lora=self.use_lora),
+                collate_fn=lambda batch: collate_fn(batch, use_lora=self.use_lora, use_lang=self.use_lang),
                 num_workers=num_workers,
                 pin_memory=True,
                 persistent_workers=num_workers > 0,
@@ -515,7 +518,7 @@ class Trainer:
                     )
                 valid_dataloader = DataLoader(
                     valid_dataset,
-                    collate_fn=lambda batch: collate_fn(batch, use_lora=self.use_lora),
+                    collate_fn=lambda batch: collate_fn(batch, use_lora=self.use_lora, use_lang=self.use_lang),
                     num_workers=num_workers,
                     pin_memory=True,
                     persistent_workers=num_workers > 0,
@@ -585,6 +588,7 @@ class Trainer:
                     mel_spec = batch["mel"].permute(0, 2, 1)
                     mel_lengths = batch["mel_lengths"]
                     lora_idx = batch.get("lora_idx", None)
+                    lang = batch.get("lang", None)
 
                     # TODO. add duration predictor training
                     if self.duration_predictor is not None and self.accelerator.is_local_main_process:
@@ -592,7 +596,7 @@ class Trainer:
                         self.accelerator.log({"duration loss": dur_loss.item()}, step=global_update)
 
                     loss, cond, pred = self.model(
-                        mel_spec, text=text_inputs, lens=mel_lengths, noise_scheduler=self.noise_scheduler, lora_idx=lora_idx
+                        mel_spec, text=text_inputs, lens=mel_lengths, noise_scheduler=self.noise_scheduler, lora_idx=lora_idx, lang=lang
                     )
                     self.accelerator.backward(loss)
 
@@ -655,6 +659,8 @@ class Trainer:
                                 lora_idx_infer = lora_idx
                             else:
                                 lora_idx_infer = lora_idx[0]
+                        # monitoring sample is generated from batch item 0; match its language id
+                        lang_infer = lang[0:1] if (self.use_lang and lang is not None) else None
                         with torch.inference_mode():
                             generated, _ = self.accelerator.unwrap_model(self.model).sample(
                                 cond=mel_spec[0][:ref_audio_len].unsqueeze(0),
@@ -663,7 +669,8 @@ class Trainer:
                                 steps=nfe_step,
                                 cfg_strength=cfg_strength,
                                 sway_sampling_coef=sway_sampling_coef,
-                                lora_idx=lora_idx_infer if self.use_lora else None
+                                lora_idx=lora_idx_infer if self.use_lora else None,
+                                lang=lang_infer,
                             )
                             generated = generated.to(torch.float32)
                             gen_mel_spec = generated[:, ref_audio_len:, :].permute(0, 2, 1).to(self.accelerator.device)
@@ -743,9 +750,10 @@ class Trainer:
                 mel_spec = batch["mel"].permute(0, 2, 1)
                 mel_lengths = batch["mel_lengths"]
                 lora_idx = batch.get("lora_idx", None)
+                lang = batch.get("lang", None)
 
                 loss, _, _ = self.model(
-                    mel_spec, text=text_inputs, lens=mel_lengths, noise_scheduler=None, lora_idx=lora_idx
+                    mel_spec, text=text_inputs, lens=mel_lengths, noise_scheduler=None, lora_idx=lora_idx, lang=lang
                 )
 
                 bs = mel_spec.size(0)

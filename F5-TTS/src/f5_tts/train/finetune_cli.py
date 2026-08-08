@@ -81,6 +81,9 @@ def main(config):
 
     model_cls = get_class(f"f5_tts.model.{config.model.backbone}")
     model_cfg = config.model.arch
+    # language-ID conditioning is enabled purely by setting arch.num_langs in the config;
+    # when unset the whole lang path (embedding, collate key, trainer plumbing) stays dormant.
+    use_lang = model_cfg.get("num_langs", None) is not None
     model = CFM(
         transformer=model_cls(**model_cfg, text_num_embeds=vocab_size, mel_dim=config.model.mel_spec.n_mel_channels),
         mel_spec_kwargs=mel_spec_kwargs,
@@ -132,24 +135,27 @@ def main(config):
         if config.model.vocoder.local_path
         else "",
         use_lora=model_cfg.get("use_lora", False),
+        use_lang=use_lang,
         **optim_cfg,
         **ckpts_cfg,
     )
 
     train_dataset = load_dataset(
-        config.datasets.name, 
-        tokenizer, 
+        config.datasets.name,
+        tokenizer,
         audio_type="train",
         mel_spec_kwargs=mel_spec_kwargs,
         use_lora=model_cfg.get("use_lora", False),
+        use_lang=use_lang,
     )
 
     valid_dataset = load_dataset(
         config.datasets.name,
-        tokenizer, 
+        tokenizer,
         audio_type="valid",
         mel_spec_kwargs=mel_spec_kwargs,
         use_lora=model_cfg.get("use_lora", False),
+        use_lang=use_lang,
     )
 
     trainer.train(

@@ -208,6 +208,7 @@ class DiT(nn.Module):
         attn_mask_enabled=False,
         long_skip_connection=False,
         checkpoint_activations=False,
+        num_langs: int | None = None,  # XTTS-style language-ID conditioning; None disables it
         use_lora: bool = False,
         lora_rank: int | None = None,
         lora_feature_dim: list | None = None,
@@ -245,6 +246,14 @@ class DiT(nn.Module):
             lora_alpha=lora_alpha,
         )
         self.text_cond, self.text_uncond = None, None  # text cache
+
+        # Language-ID conditioning: a per-language embedding added to the global AdaLN
+        # conditioning vector `t` (same injection point XTTS uses for its language token).
+        # Zero-initialised (see initialize_weights) so a pretrained checkpoint loaded with
+        # num_langs set starts as an exact no-op and learns the language offsets from there.
+        self.num_langs = num_langs
+        self.lang_embed = nn.Embedding(num_langs, dim) if num_langs is not None else None
+
         self.input_embed = InputEmbedding(
             mel_dim, 
             text_dim, 
@@ -308,9 +317,16 @@ class DiT(nn.Module):
         nn.init.constant_(self.proj_out.weight, 0)
         nn.init.constant_(self.proj_out.bias, 0)
 
+        # Zero-init language embedding -> no-op at load time, learns offsets during training.
+        if self.lang_embed is not None:
+            nn.init.constant_(self.lang_embed.weight, 0)
+
         if self.use_lora:
             for name, param in self.named_parameters():
-                if "lora" in name.lower():
+                # keep the language embedding trainable alongside LoRA adapters, otherwise the
+                # LoRA freeze below would pin it at its zero init and language conditioning
+                # would never take effect.
+                if "lora" in name.lower() or "lang_embed" in name.lower():
                     param.requires_grad = True
                 else:
                     param.requires_grad = False
@@ -392,6 +408,7 @@ class DiT(nn.Module):
         cfg_infer: bool = False,  # cfg inference, pack cond & uncond forward
         cache: bool = False,
         lora_idx: torch.Tensor | None = None,
+        lang: int["b"] | None = None,  # per-sample language id for language-ID conditioning
     ):
         batch, seq_len = x.shape[0], x.shape[1]
         if time.ndim == 0:
@@ -399,6 +416,14 @@ class DiT(nn.Module):
 
         # t: conditioning time, text: text, x: noised audio + cond audio + text
         t = self.time_embed(time, lora_idx[0] if lora_idx is not None else None)
+
+        # add the language offset into the shared conditioning vector. Done before the cfg pack
+        # below so language identity is kept in both the conditional and unconditional branches
+        # (language is treated as content, not a style to guide away from).
+        if self.lang_embed is not None and lang is not None:
+            if lang.ndim == 0:
+                lang = lang.repeat(batch)
+            t = t + self.lang_embed(lang)
         if cfg_infer:  # pack cond & uncond forward: b n d -> 2b n d
             x_cond = self.get_input_embed(
                 x, cond, text, drop_audio_cond=False, drop_text=False, cache=cache, audio_mask=mask, lora_idx=lora_idx[0] if lora_idx is not None else None
