@@ -11,7 +11,7 @@
 #
 #$ -N infer_array
 #$ -cwd
-#$ -q gpu
+#$ -q gpu,gpu_new    # gpu queue was fully disabled 2026-08; gpu_new holds current GPU capacity. Both listed so it survives gpu being re-enabled.
 #$ -l gpu=1
 #$ -l h_rt=02:00:00          # one shard of one combo is short; generous ceiling
 #$ -l h_vmem=64G             # VIRTUAL mem ceiling; CUDA reserves ~50G vmem/process (see [[eddie-hvmem-cuda-gotcha]])
