@@ -2,7 +2,9 @@
 # Decoupled-accent (Hindi / Bengali / Arabic) CHECKPOINT x alpha inference grid on Eddie
 # (mirrors submit_dutch_ckpt_grid.sh). All use FLEURS L1 prompts + SAA ground truth.
 #
-# Grid = N_CHECKPOINTS evenly-spaced training steps (up to LAST_STEP; 0 = auto = max available)
+# Grid = checkpoints every STEP_INTERVAL steps (default 5k; up to LAST_STEP, 0=auto=max avail),
+#        snapped to nearest snapshot so runs of different length align -- STEP_INTERVAL=0 falls
+#        back to N_CHECKPOINTS evenly-spaced per-run fractions
 #        x REF_KINDS {l1 native} x SPEAKERS {m f} x transcript-SHARDS,
 # each an alpha sweep {0 0.25 0.5 0.75 1.0} ->
 #   results/<accent>/<ref_kind>/<speaker>/step_<step>/alpha_<a>/utt####.wav
@@ -19,7 +21,7 @@
 #   ACCENT=bengali RUN_DIR=/exports/.../F5TTS_v1_LoRA_bengali/<ts> bash scripts/submit_indic_ckpt_grid.sh
 #   ACCENT=arabic  RUN_DIR=/exports/.../F5TTS_v1_LoRA_arabic/<ts>  bash scripts/submit_indic_ckpt_grid.sh
 #   DRY_RUN=1 ...   (print the manifest, don't submit)
-#   N_CHECKPOINTS=8 SHARDS=2 MAX_CONCURRENT=12 ...
+#   STEP_INTERVAL=5000 SHARDS=2 MAX_CONCURRENT=12 ...   (STEP_INTERVAL=0 N_CHECKPOINTS=8 = even-spacing)
 set -uo pipefail
 
 ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
@@ -44,7 +46,11 @@ l1base() {
 RUN_DIR=${RUN_DIR:?set RUN_DIR=<the ${ACCENT} training run dir with config.yaml/vocab.txt/ckpts>}
 CKPT_DIR=${CKPT_DIR:-"$RUN_DIR/ckpts/snapshots"}
 LAST_STEP=${LAST_STEP:-0}          # 0 = auto: use the max available step
-N_CHECKPOINTS=${N_CHECKPOINTS:-8}
+STEP_INTERVAL=${STEP_INTERVAL:-5000}  # pick checkpoints on a FIXED step grid (5k,10k,...) up to
+                                      # LAST_STEP, snapped to nearest available -> runs of slightly
+                                      # different length align on the same x-axis for overlay plots.
+                                      # 0 = fall back to N_CHECKPOINTS evenly-spaced per-run fractions.
+N_CHECKPOINTS=${N_CHECKPOINTS:-8}  # only used when STEP_INTERVAL=0
 REF_KINDS=${REF_KINDS:-"l1 native"}
 SPEAKERS=${SPEAKERS:-"m f"}
 ALPHAS=${ALPHAS:-"0 0.25 0.5 0.75 1.0"}     # space-sep; passed via -v, wrapper -> commas
@@ -75,20 +81,27 @@ fi
 # LAST_STEP=0 -> use the largest available step
 [ "$LAST_STEP" -gt 0 ] || LAST_STEP=$(printf '%s\n' "${STEPS[@]}" | sort -n | tail -1)
 
-# pick N steps evenly spaced by step value, ending at LAST_STEP, snapped to nearest available.
+# Select checkpoints to sweep. Default: a FIXED step grid (STEP_INTERVAL: 5k,10k,...) up to
+# LAST_STEP, each snapped to the nearest available snapshot -- so runs of slightly different
+# length are evaluated at the SAME steps and overlay cleanly. STEP_INTERVAL=0 -> N_CHECKPOINTS
+# evenly-spaced fractions of this run's own length.
 SELECTED=$(printf '%s\n' "${STEPS[@]}" | python3 -c '
 import sys
-last=int(sys.argv[1]); n=int(sys.argv[2])
+last=int(sys.argv[1]); n=int(sys.argv[2]); interval=int(sys.argv[3])
 avail=sorted(set(int(x) for x in sys.stdin.read().split()))
 cands=[s for s in avail if s<=last] or avail
-targets=[round(k*last/n) for k in range(1,n+1)]
+if interval>0:
+    targets=list(range(interval, last+1, interval)) or [last]
+else:
+    targets=[round(k*last/n) for k in range(1,n+1)]
 picked=[]
 for t in targets:
     s=min(cands, key=lambda a: abs(a-t))
     if s not in picked: picked.append(s)
 print(" ".join(str(s) for s in sorted(picked)))
-' "$LAST_STEP" "$N_CHECKPOINTS")
-echo "[$ACCENT] checkpoints: ${#STEPS[@]} ${CKPT_PREFIX}_<step>.pt available; picked $(echo "$SELECTED" | wc -w | tr -d ' ') up to $LAST_STEP: $SELECTED"
+' "$LAST_STEP" "$N_CHECKPOINTS" "$STEP_INTERVAL")
+sel_desc=$([ "$STEP_INTERVAL" -gt 0 ] && echo "every ${STEP_INTERVAL} steps" || echo "${N_CHECKPOINTS} evenly-spaced")
+echo "[$ACCENT] checkpoints: ${#STEPS[@]} ${CKPT_PREFIX}_<step>.pt available; picked $(echo "$SELECTED" | wc -w | tr -d ' ') ($sel_desc) up to $LAST_STEP: $SELECTED"
 
 MANIFEST="logs/${ACCENT}_ckpt_tasks.$(date +%Y%m%d_%H%M%S).tsv"; : > "$MANIFEST"
 n_combos=0 n_skipped=0
