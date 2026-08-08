@@ -51,6 +51,10 @@ ALPHAS=${ALPHAS:-"0 0.25 0.5 0.75 1.0"}     # space-sep; passed via -v, wrapper 
 SHARDS=${SHARDS:-1}
 MAX_CONCURRENT=${MAX_CONCURRENT:-8}
 NATIVE_PREFIX=${NATIVE_PREFIX:-prompts/GAE/gae}
+# Optional label separating this sweep -> results/<accent>/<tag>/<ref_kind>/... so cells
+# whose step_<step> dirs would otherwise clash (e.g. a hparam grid: RESULTS_TAG=lr3e5_r16)
+# stay distinct. Must be space/comma-free (rides qsub -v). Empty = old flat layout.
+RESULTS_TAG=${RESULTS_TAG:-}
 
 # --- run dir sanity ---
 for f in "$RUN_DIR/config.yaml" "$RUN_DIR/vocab.txt"; do
@@ -117,7 +121,9 @@ N=$(wc -l < "$MANIFEST" | tr -d ' ')
 echo "manifest: $MANIFEST  ($n_combos combos x $SHARDS shard(s) = $N tasks; $n_skipped skipped)"
 [ "$N" -gt 0 ] || { echo "no runnable tasks (assets missing); prepare them and re-run." >&2; rm -f "$MANIFEST"; exit 1; }
 
-QSUB=(qsub -t "1-$N" -tc "$MAX_CONCURRENT" -v "ALPHAS=$ALPHAS" scripts/eddie_infer_array.sh "$ACCENT_DIR/$MANIFEST")
+QSUB=(qsub -t "1-$N" -tc "$MAX_CONCURRENT" -v "ALPHAS=$ALPHAS")
+[ -n "$RESULTS_TAG" ] && QSUB+=(-v "RESULTS_TAG=$RESULTS_TAG")
+QSUB+=(scripts/eddie_infer_array.sh "$ACCENT_DIR/$MANIFEST")
 if [ "${DRY_RUN:-0}" = 1 ]; then
   echo "--- manifest rows ---"; cat "$MANIFEST"
   echo "--- would submit ---"; printf '  %q ' "${QSUB[@]}"; printf '\n'

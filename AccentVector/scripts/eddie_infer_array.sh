@@ -75,8 +75,11 @@ fi
 # ALPHAS arrives via qsub -v (space-separated to dodge the comma-splitting); normalise here.
 export ALPHAS="${ALPHAS:-0,0.25,0.5,0.75,1.0}"
 export ALPHAS="${ALPHAS// /,}"
-# OUT_DIR: results/<accent>/<ref_kind>/<speaker>[/<out_subdir, e.g. step_NNN>].
-export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT}/${REF_KIND}${SPEAKER:+/$SPEAKER}${OUT_SUBDIR:+/$OUT_SUBDIR}"}
+# OUT_DIR: results/<accent>[/<results_tag>]/<ref_kind>/<speaker>[/<out_subdir, e.g. step_NNN>].
+# RESULTS_TAG (optional, via qsub -v) separates otherwise-identical sweeps whose paths
+# would otherwise clash -- e.g. a hyperparameter cell (lr3e5_r16) whose step_<step> dirs
+# collide in the shared results/<accent> tree. Base-accent asset lookups are unaffected.
+export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT}${RESULTS_TAG:+/$RESULTS_TAG}/${REF_KIND}${SPEAKER:+/$SPEAKER}${OUT_SUBDIR:+/$OUT_SUBDIR}"}
 
 # REF_TEXT may be a literal or a file path (romanised L1 transcript file for hi/bn); cat if a file.
 if [ -f "$REF_TEXT" ]; then REF_TEXT="$(cat "$REF_TEXT")"

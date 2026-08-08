@@ -14,6 +14,9 @@ REF_KINDS=${REF_KINDS:-"l1 native"}
 SPEAKERS=${SPEAKERS:-"m f"}
 STEP_SCOPE=${STEP_SCOPE:-all}          # all | final
 MAX_CONCURRENT=${MAX_CONCURRENT:-16}
+# Must match the RESULTS_TAG the sweep was submitted with -> globs results/<accent>/<tag>/...
+# Empty = old flat layout results/<accent>/... (untagged sweeps).
+RESULTS_TAG=${RESULTS_TAG:-}
 
 # per-accent, per-speaker L1 reference basename (matches submit_indic_ckpt_grid.sh)
 l1base() { case "$1/$2" in
@@ -34,8 +37,9 @@ for a in $ACCENTS; do for r in $REF_KINDS; do for s in $SPEAKERS; do
   tx="transcripts/$a/${a}_${s}_eval.txt"
   gt="ground_truth_refs/$a/$(gdir "$s")"; [ -d "$gt" ] || gt=""    # empty => cs_accent/rq3 skipped
 
-  steps=$(ls -d "results/$a/$r/$s"/step_* 2>/dev/null | sort -t_ -k2 -n)
-  [ -n "$steps" ] || { echo "  no sweeps under results/$a/$r/$s"; continue; }
+  rroot="results/$a${RESULTS_TAG:+/$RESULTS_TAG}/$r/$s"
+  steps=$(ls -d "$rroot"/step_* 2>/dev/null | sort -t_ -k2 -n)
+  [ -n "$steps" ] || { echo "  no sweeps under $rroot"; continue; }
   [ "$STEP_SCOPE" = final ] && steps=$(echo "$steps" | tail -1)
 
   for d in $steps; do
