@@ -36,7 +36,7 @@ echo "repo=$REPO  HF_HOME=$HF_HOME  envs={$EVAL_ENV,$GENAID_ENV,$UTMOS_ENV}"
 
 build_envs() {
   echo "== [1/3] slp-eval (WER/PPG/F0/MCD) =="
-  conda create -y -n "$EVAL_ENV" python=3.11
+  conda env list | grep -qE "envs/${EVAL_ENV}$" || conda create -y -n "$EVAL_ENV" python=3.11
   # On Linux x86_64 pyworld ships wheels, so pip alone works (unlike the macOS note in
   # requirements-eval.txt); fall back to conda-forge if the wheel is unavailable.
   conda run -n "$EVAL_ENV" pip install -r "$EVAL_DIR/requirements-eval.txt" \
@@ -45,11 +45,14 @@ build_envs() {
          conda run -n "$EVAL_ENV" pip install -r "$EVAL_DIR/requirements-eval.txt"; }
 
   echo "== [2/3] slp-utmos (UTMOS) =="
-  conda create -y -n "$UTMOS_ENV" python=3.11
-  conda run -n "$UTMOS_ENV" pip install utmosv2
+  conda env list | grep -qE "envs/${UTMOS_ENV}$" || conda create -y -n "$UTMOS_ENV" python=3.11
+  # utmosv2 is NOT on PyPI -- install from git, pinned to the commit locked in ../pyproject.toml
+  # + uv.lock (bump both together if you change it).
+  conda run -n "$UTMOS_ENV" pip install \
+    "utmosv2 @ git+https://github.com/sarulab-speech/UTMOSv2.git@cc2700db57bb83ee13dc31ebe1b868c254e15d09"
 
   echo "== [3/3] genaid (accent-embed / speaker-sim / LID) =="
-  conda create -y -n "$GENAID_ENV" python=3.10
+  conda env list | grep -qE "envs/${GENAID_ENV}$" || conda create -y -n "$GENAID_ENV" python=3.10
   conda run -n "$GENAID_ENV" pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
   conda run -n "$GENAID_ENV" pip install -r "$EVAL_DIR/requirements-genaid.txt"
   # editable speechbrain install happens in setup_genaid (needs the clone present first)
