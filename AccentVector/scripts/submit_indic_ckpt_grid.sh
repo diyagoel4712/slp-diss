@@ -25,10 +25,11 @@
 set -uo pipefail
 
 ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
-ACCENT=${ACCENT:?set ACCENT=hindi, bengali or arabic}
+ACCENT=${ACCENT:?set ACCENT=hindi, bengali, arabic or mandarin}
 
-# Decoupled non-Latin accents (FLEURS L1 prompts + SAA GT), same grid pattern.
-case "$ACCENT" in hindi|bengali|arabic) ;; *) echo "ACCENT must be hindi, bengali or arabic (got '$ACCENT')" >&2; exit 1;; esac
+# Decoupled non-Latin accents (held-out L1 prompts + SAA GT), same grid pattern.
+# L1 prompts: hindi/bengali/arabic = FLEURS; mandarin = held-out AISHELL (Hanzi ref-text).
+case "$ACCENT" in hindi|bengali|arabic|mandarin) ;; *) echo "ACCENT must be hindi, bengali, arabic or mandarin (got '$ACCENT')" >&2; exit 1;; esac
 # L1 (native-language) reference basename for a given speaker (a function, not an assoc
 # array, so it runs on old bash too). Empty output => unknown; caller treats as missing.
 l1base() {
@@ -40,6 +41,10 @@ l1base() {
     # Arabic: set to the actual FLEURS ar_{M,F}_NN IDs chosen at prompt-prep time.
     arabic/m)  echo prompts/arabic/ar_M_01;;
     arabic/f)  echo prompts/arabic/ar_F_01;;
+    # Mandarin: held-out AISHELL speakers (Hanzi ref-text, no romanisation); set to the
+    # actual ids printed by extract_aishell_prompts.py.
+    mandarin/m) echo prompts/mandarin/mandarin_M_C0002;;
+    mandarin/f) echo prompts/mandarin/mandarin_F_C0004;;
   esac
 }
 

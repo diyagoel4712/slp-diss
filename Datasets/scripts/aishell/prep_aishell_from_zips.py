@@ -60,6 +60,9 @@ def main():
     ap.add_argument("--max-per-gender", type=int, default=0,
                     help="cap speakers per gender (0 = all, balanced to the smaller gender)")
     ap.add_argument("--area", default="", help="optional: keep only this speaker area (e.g. North)")
+    ap.add_argument("--exclude-speakers", default="",
+                    help="comma-sep zip-stem ids to hold out of training (e.g. those used as L1 "
+                         "prompts by extract_aishell_prompts.py) -- keeps the prompt speaker unseen")
     args = ap.parse_args()
 
     root, out = Path(args.root), Path(args.out)
@@ -67,8 +70,13 @@ def main():
     info = read_spkrinfo(root / "docs" / "spkrinfo.txt")
 
     avail = {z.stem: z for z in (root / "data").glob("C*.zip")}
+    exclude = {s.strip() for s in args.exclude_speakers.split(",") if s.strip()}
+    if exclude:
+        print(f"excluding {len(exclude)} held-out speaker(s): {sorted(exclude)}", file=sys.stderr)
     by_g = {"M": [], "F": []}
     for spk in sorted(avail):
+        if spk in exclude:
+            continue
         g, area = info.get(spk, ("?", ""))
         if args.area and area != args.area:
             continue

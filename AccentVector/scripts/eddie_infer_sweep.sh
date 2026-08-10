@@ -90,8 +90,9 @@ elif [ -f "$ACCENT_DIR/$REF_TEXT" ]; then
     REF_TEXT="$(cat "$ACCENT_DIR/$REF_TEXT")"
 fi
 export REF_TEXT
-# nest per-speaker (results/<accent>/<ref_kind>/<speaker>/) when SPEAKER is set.
-export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}/${REF_KIND}${SPEAKER:+/$SPEAKER}"}
+# nest per-speaker (results/<accent>/<ref_kind>/<speaker>/audio/) when SPEAKER is set.
+# audio/ mirrors the array/eval split so CSVs can live in a sibling metrics/ tree.
+export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}/${REF_KIND}${SPEAKER:+/$SPEAKER}/audio"}
 # LoRA is the paper-matching default in infer_sweep.sh; set LORA=0 for a merged sweep.
 export LORA=${LORA:-1}
 

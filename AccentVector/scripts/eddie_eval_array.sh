@@ -50,7 +50,7 @@ IFS=$'\t' read -r ACCENT SPEAKER REF_KIND SWEEP_DIR TRANSCRIPTS REF_WAV GT_DIR <
 
 # CSVs go to a sibling metrics/ tree so audio (large, stays on Eddie/scratch) and metrics
 # (tiny, pulled to the Mac) stay separable:  .../<speaker>/audio/step_N -> .../metrics/step_N
-METRICS_DIR="${SWEEP_DIR/\/audio\//\/metrics\/}"
+METRICS_DIR="${SWEEP_DIR%/audio/*}/metrics/${SWEEP_DIR##*/audio/}"
 mkdir -p "$METRICS_DIR"
 
 echo "[eval $JOB_ID.$SGE_TASK_ID] $ACCENT/$REF_KIND/$SPEAKER  $(basename "$SWEEP_DIR")"
