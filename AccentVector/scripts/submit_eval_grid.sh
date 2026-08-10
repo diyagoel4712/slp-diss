@@ -1,6 +1,8 @@
 #!/bin/bash
 # Build the eval manifest over EXISTING sweep dirs and submit the CPU array
-# (scripts/eddie_eval_array.sh). One task per results/<accent>/<ref_kind>/<speaker>/step_*/.
+# (scripts/eddie_eval_array.sh). One task per
+# results/<accent>[/<tag>]/<ref_kind>/<speaker>/audio/step_*/ ; the array writes the
+# CSVs to the sibling metrics/ tree (.../metrics/step_*/).
 #
 #   bash scripts/submit_eval_grid.sh                       # full grid, all accents/steps
 #   STEP_SCOPE=final bash scripts/submit_eval_grid.sh      # only the final checkpoint per cell
@@ -37,7 +39,7 @@ for a in $ACCENTS; do for r in $REF_KINDS; do for s in $SPEAKERS; do
   tx="transcripts/$a/${a}_${s}_eval.txt"
   gt="ground_truth_refs/$a/$(gdir "$s")"; [ -d "$gt" ] || gt=""    # empty => cs_accent/rq3 skipped
 
-  rroot="results/$a${RESULTS_TAG:+/$RESULTS_TAG}/$r/$s"
+  rroot="results/$a${RESULTS_TAG:+/$RESULTS_TAG}/$r/$s/audio"
   steps=$(ls -d "$rroot"/step_* 2>/dev/null | sort -t_ -k2 -n)
   [ -n "$steps" ] || { echo "  no sweeps under $rroot"; continue; }
   [ "$STEP_SCOPE" = final ] && steps=$(echo "$steps" | tail -1)

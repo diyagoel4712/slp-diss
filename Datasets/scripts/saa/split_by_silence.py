@@ -42,22 +42,33 @@ def main():
     ap.add_argument("--n", type=int, default=5, help="number of utterances to split into")
     ap.add_argument("--noise", default="-30", help="silence threshold in dB (raise toward -25 to find more)")
     ap.add_argument("--min-sil", type=float, default=0.25, help="min silence length (s) to count as a pause")
+    ap.add_argument("--at", default="",
+                    help="explicit comma-sep boundary times (s), e.g. 2.1,5.8,9.0,12.4 -- skips "
+                         "silencedetect. Use when auto-split misfires (pauses != sentence boundaries).")
+    ap.add_argument("--list-silences", action="store_true",
+                    help="just print all detected pauses (candidates for --at) and exit")
     args = ap.parse_args()
 
     if not Path(args.in_wav).is_file():
         sys.exit(f"input not found: {args.in_wav}")
     total = duration(args.in_wav)
-    sils = silences(args.in_wav, args.noise, args.min_sil)
 
-    # interior pauses only (ignore leading/trailing silence), then take the N-1 longest
-    interior = [s for s in sils if s[0] > 0.05 and s[1] < total - 0.05]
-    interior.sort(key=lambda x: -x[2])
-    chosen = sorted(interior[:args.n - 1], key=lambda x: x[0])
-    if len(chosen) < args.n - 1:
-        print(f"! only {len(chosen)} interior pauses found for {args.n} clips -- "
-              f"lower --min-sil or raise --noise (e.g. -25), or cut the rest by hand", file=sys.stderr)
+    if args.list_silences:
+        for s, e, d in silences(args.in_wav, args.noise, args.min_sil):
+            print(f"  pause {s:6.2f}-{e:6.2f}s  (mid {((s+e)/2):.2f}, dur {d:.2f})")
+        return
 
-    cuts = [(c[0] + c[1]) / 2 for c in chosen]          # cut at pause midpoints
+    if args.at:                                         # explicit boundaries by ear
+        cuts = sorted(float(x) for x in args.at.split(",") if x.strip())
+    else:                                               # auto: N-1 longest interior pauses
+        sils = silences(args.in_wav, args.noise, args.min_sil)
+        interior = [s for s in sils if s[0] > 0.05 and s[1] < total - 0.05]
+        interior.sort(key=lambda x: -x[2])
+        chosen = sorted(interior[:args.n - 1], key=lambda x: x[0])
+        if len(chosen) < args.n - 1:
+            print(f"! only {len(chosen)} interior pauses found for {args.n} clips -- "
+                  f"lower --min-sil or raise --noise (e.g. -25), or pass --at", file=sys.stderr)
+        cuts = [(c[0] + c[1]) / 2 for c in chosen]      # cut at pause midpoints
     bounds = [0.0] + cuts + [total]
     out_dir = Path(args.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     for i in range(len(bounds) - 1):

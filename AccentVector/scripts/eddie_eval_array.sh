@@ -48,8 +48,13 @@ LINE="$(sed -n "${SGE_TASK_ID}p" "$MANIFEST")"
 [ -n "$LINE" ] || { echo "no manifest row for task $SGE_TASK_ID" >&2; exit 1; }
 IFS=$'\t' read -r ACCENT SPEAKER REF_KIND SWEEP_DIR TRANSCRIPTS REF_WAV GT_DIR <<< "$LINE"
 
+# CSVs go to a sibling metrics/ tree so audio (large, stays on Eddie/scratch) and metrics
+# (tiny, pulled to the Mac) stay separable:  .../<speaker>/audio/step_N -> .../metrics/step_N
+METRICS_DIR="${SWEEP_DIR/\/audio\//\/metrics\/}"
+mkdir -p "$METRICS_DIR"
+
 echo "[eval $JOB_ID.$SGE_TASK_ID] $ACCENT/$REF_KIND/$SPEAKER  $(basename "$SWEEP_DIR")"
-echo "  gt=${GT_DIR:-<none: cs_accent+rq3 skipped>}  offline=$HF_HUB_OFFLINE"
+echo "  gt=${GT_DIR:-<none: cs_accent+rq3 skipped>}  offline=$HF_HUB_OFFLINE  metrics=$METRICS_DIR"
 for f in "$SWEEP_DIR" "$TRANSCRIPTS" "$REF_WAV"; do
   [ -e "$f" ] || { echo "ERROR: missing $f" >&2; exit 1; }
 done
@@ -57,17 +62,17 @@ done
 # --- RQ1 (+ leakage/LID). cs_accent only when a GT dir is present. ---
 python -m accent_vector.experiments.rq1_reproduction \
   --sweep-dir "$SWEEP_DIR" --transcripts "$TRANSCRIPTS" --ref-wav "$REF_WAV" --lid \
-  ${GT_DIR:+--accent-ref "$GT_DIR"} --out-csv "$SWEEP_DIR/rq1.csv"
+  ${GT_DIR:+--accent-ref "$GT_DIR"} --out-csv "$METRICS_DIR/rq1.csv"
 
 # --- RQ3 decomposition: needs natural target-accent clips. ---
 if [ -n "${GT_DIR:-}" ]; then
   python -m accent_vector.experiments.rq3_decomposition \
-    --sweep-dir "$SWEEP_DIR" --natural-ref "$GT_DIR" --out-csv "$SWEEP_DIR/rq3.csv"
+    --sweep-dir "$SWEEP_DIR" --natural-ref "$GT_DIR" --out-csv "$METRICS_DIR/rq3.csv"
 else
   echo "  [rq3] skipped (no GT_DIR for $ACCENT/$SPEAKER)"
 fi
 
 # --- UTMOS (own env, reference-free). ---
-"$UTMOS_PYTHON" "$EVAL_DIR/score_utmos.py" --sweep-dir "$SWEEP_DIR" --out-csv "$SWEEP_DIR/utmos.csv"
+"$UTMOS_PYTHON" "$EVAL_DIR/score_utmos.py" --sweep-dir "$SWEEP_DIR" --out-csv "$METRICS_DIR/utmos.csv"
 
-echo "[eval $JOB_ID.$SGE_TASK_ID] done -> $SWEEP_DIR/{rq1,rq3,utmos}.csv"
+echo "[eval $JOB_ID.$SGE_TASK_ID] done -> $METRICS_DIR/{rq1,rq3,utmos}.csv"
