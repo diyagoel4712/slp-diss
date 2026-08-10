@@ -37,6 +37,9 @@ echo "repo=$REPO  HF_HOME=$HF_HOME  envs={$EVAL_ENV,$GENAID_ENV,$UTMOS_ENV}"
 build_envs() {
   echo "== [1/3] slp-eval (WER/PPG/F0/MCD) =="
   conda env list | grep -qE "envs/${EVAL_ENV}$" || conda create -y -n "$EVAL_ENV" python=3.11
+  # Whisper (WER) decodes audio by shelling out to the ffmpeg BINARY -- a system tool, not a
+  # pip package, so requirements-eval.txt can't cover it. Install it into the env's bin.
+  conda install -y -n "$EVAL_ENV" -c conda-forge ffmpeg
   # On Linux x86_64 pyworld ships wheels, so pip alone works (unlike the macOS note in
   # requirements-eval.txt); fall back to conda-forge if the wheel is unavailable.
   conda run -n "$EVAL_ENV" pip install -r "$EVAL_DIR/requirements-eval.txt" \

@@ -40,7 +40,8 @@ def main():
     for alpha, d in alpha_dirs(a.sweep_dir):
         if not any(d.glob("*.wav")):
             continue
-        preds = model.predict(input_dir=str(d))            # [{'file_path','predicted_mos'}]
+        # eval runs on CPU nodes (no GPU); utmosv2.predict defaults to CUDA, so pin CPU.
+        preds = model.predict(input_dir=str(d), device="cpu")   # [{'file_path','predicted_mos'}]
         mos = [x["predicted_mos"] for x in preds]
         rows.append({"alpha": alpha,
                      "utmos": float(np.mean(mos)) if mos else float("nan"),
