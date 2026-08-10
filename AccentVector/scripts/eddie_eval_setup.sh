@@ -81,6 +81,23 @@ setup_genaid() {
     sed -i 's/except ValueError:/except Exception:/g' "$iface"
   fi
   # #3 (librosa load + classify_batch) already lives in the wrappers -> copied below.
+  # #4 offline: _check_model_source() calls model_info() (a Hub NETWORK call) to classify
+  #    the XLSR backbone; HF_HUB_OFFLINE=1 makes that a hard error on internet-less compute
+  #    nodes. Wrap it so an unreachable Hub falls back to "HF format" + the local cache.
+  hfw="$GENAID_ROOT/speechbrain/lobes/models/huggingface_wav2vec.py"
+  [ -f "$hfw" ] && python3 - "$hfw" <<'PYEOF'
+import re, sys, pathlib
+p = pathlib.Path(sys.argv[1]); s = p.read_text()
+if "OFFLINE-PATCH" in s:
+    print("  hf_wav2vec: already patched"); sys.exit()
+m = re.search(r'([ \t]*)files = model_info\(\s*path\s*\)\.siblings[^\n]*', s)
+if not m:
+    print("  WARN: _check_model_source model_info() call not found; patch by hand"); sys.exit()
+ind = m.group(1)
+s = s[:m.start()] + (f"{ind}try:  # OFFLINE-PATCH\n{ind}    files = model_info(path).siblings\n"
+                     f"{ind}except Exception:\n{ind}    return False, checkpoint_filename, is_local\n") + s[m.end():]
+p.write_text(s); print("  hf_wav2vec: patched _check_model_source for offline")
+PYEOF
 
   echo "  copying tracked wrappers into the clone"
   cp "$EVAL_DIR"/genaid_wrappers/predict_*.py "$GENAID_CA"/

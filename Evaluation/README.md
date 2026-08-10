@@ -93,7 +93,7 @@ Copy these from version control / this dissertation's records into the clone:
 ### Required patches to the SpeechBrain fork
 
 The fork targets a 2023-era SpeechBrain; modern `huggingface_hub`/`torchaudio` need
-three edits:
+these edits:
 
 1. `speechbrain/pretrained/fetching.py` — in the `hf_hub_download(...)` call, rename
    `use_auth_token=use_auth_token` → `token=use_auth_token` (arg was renamed).
@@ -103,6 +103,12 @@ three edits:
 3. In `predict_commonaccent.py` / `predict_speaker_embeddings.py`, load audio with
    `librosa` and call `classify_batch` / `encode_batch` instead of `classify_file`
    (avoids torchaudio's `torchcodec` backend dependency).
+4. `speechbrain/lobes/models/huggingface_wav2vec.py` — in `_check_model_source`, wrap the
+   `files = model_info(path).siblings` Hub call in `try/except` and, on failure, `return
+   False, checkpoint_filename, is_local` (assume HF format). Old SpeechBrain hits the Hub
+   just to classify the XLSR backbone even when it's cached, so `HF_HUB_OFFLINE=1` makes it
+   a hard error on internet-less compute nodes. Applied automatically by
+   `AccentVector/scripts/eddie_eval_setup.sh` (patch #4).
 
 Also note `predict_GenAID.py` passes `device` to `pretrainer.load_collected(device=...)`
 (checkpoint was saved on CUDA) and includes the unused speaker-adversarial head so the
