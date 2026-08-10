@@ -104,6 +104,9 @@ def main():
                     help="which GlobalPhone romanisation to read (default trl)")
     ap.add_argument("--min-dur", type=float, default=3.0, help="drop clips shorter than this (s)")
     ap.add_argument("--max-dur", type=float, default=30.0, help="drop clips longer than this (s)")
+    ap.add_argument("--exclude-speakers", default="",
+                    help="comma-sep AR ids to hold out of training (e.g. those used as L1 prompts "
+                         "by extract_gp_prompts.py) -- keeps the prompt speaker truly unseen")
     args = ap.parse_args()
 
     root, out = Path(args.root), Path(args.out)
@@ -112,6 +115,10 @@ def main():
         sys.exit(f"shorten binary not executable: {args.shorten} (build it, or pass --shorten)")
 
     trls = sorted((root / args.tier).glob("AR*." + args.tier))
+    exclude = {s.strip() for s in args.exclude_speakers.split(",") if s.strip()}
+    if exclude:
+        trls = [t for t in trls if t.stem not in exclude]
+        print(f"excluding {len(exclude)} held-out speaker(s): {sorted(exclude)}", file=sys.stderr)
     print(f"{len(trls)} speakers", file=sys.stderr)
 
     meta_f = open(out / "metadata.csv", "w", newline="", encoding="utf-8")
