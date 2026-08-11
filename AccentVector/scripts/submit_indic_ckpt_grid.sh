@@ -38,9 +38,9 @@ l1base() {
     hindi/f)   echo prompts/hindi/hi_F_02;;
     bengali/m) echo prompts/bengali/bn_M_01;;
     bengali/f) echo prompts/bengali/bn_F_02;;
-    # Arabic: set to the actual FLEURS ar_{M,F}_NN IDs chosen at prompt-prep time.
-    arabic/m)  echo prompts/arabic/ar_M_01;;
-    arabic/f)  echo prompts/arabic/ar_F_01;;
+    # Arabic: held-out GlobalPhone speakers (extract_gp_prompts.py); GP romanised ref-text.
+    arabic/m)  echo prompts/arabic/ar_M_AR010;;
+    arabic/f)  echo prompts/arabic/ar_F_AR002;;
     # Mandarin: held-out AISHELL speakers (Hanzi ref-text, no romanisation); set to the
     # actual ids printed by extract_aishell_prompts.py.
     mandarin/m) echo prompts/mandarin/mandarin_M_C0002;;
