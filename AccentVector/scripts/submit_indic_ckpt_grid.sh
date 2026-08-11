@@ -41,10 +41,9 @@ l1base() {
     # Arabic: held-out GlobalPhone speakers (extract_gp_prompts.py); GP romanised ref-text.
     arabic/m)  echo prompts/arabic/ar_M_AR010;;
     arabic/f)  echo prompts/arabic/ar_F_AR002;;
-    # Mandarin: held-out AISHELL speakers (Hanzi ref-text, no romanisation); set to the
-    # actual ids printed by extract_aishell_prompts.py.
-    mandarin/m) echo prompts/mandarin/mandarin_M_C0002;;
-    mandarin/f) echo prompts/mandarin/mandarin_F_C0004;;
+    # Mandarin: held-out FLEURS speakers (Hanzi ref-text; F5 pinyin-converts at infer).
+    mandarin/m) echo prompts/mandarin/mandarin_M_824;;
+    mandarin/f) echo prompts/mandarin/mandarin_F_369;;
   esac
 }
 

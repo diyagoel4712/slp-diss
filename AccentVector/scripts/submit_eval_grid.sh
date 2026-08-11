@@ -27,6 +27,8 @@ l1base() { case "$1/$2" in
   bengali/m) echo prompts/bengali/bn_M_01;; bengali/f) echo prompts/bengali/bn_F_02;;
   # Arabic: held-out GlobalPhone speakers (must match l1base in submit_indic_ckpt_grid.sh).
   arabic/m)  echo prompts/arabic/ar_M_AR010;;  arabic/f)  echo prompts/arabic/ar_F_AR002;;
+  # Mandarin: held-out FLEURS speakers (must match l1base in submit_indic_ckpt_grid.sh).
+  mandarin/m) echo prompts/mandarin/mandarin_M_824;; mandarin/f) echo prompts/mandarin/mandarin_F_369;;
 esac; }
 gdir() { [ "$1" = f ] && echo female || echo male; }   # speaker -> GT gender dir
 
