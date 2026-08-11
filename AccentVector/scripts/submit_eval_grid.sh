@@ -25,9 +25,8 @@ l1base() { case "$1/$2" in
   dutch/m)   echo prompts/dutch/dutch_m;;   dutch/f)   echo prompts/dutch/dutch_f;;
   hindi/m)   echo prompts/hindi/hi_M_04;;   hindi/f)   echo prompts/hindi/hi_F_02;;
   bengali/m) echo prompts/bengali/bn_M_01;; bengali/f) echo prompts/bengali/bn_F_02;;
-  # Arabic (decoupled, FLEURS L1 prompts) -- confirm the actual ar_{M,F}_NN speaker IDs
-  # chosen at prompt-prep time; l1 rows auto-skip until prompts/arabic/<base>.wav exists.
-  arabic/m)  echo prompts/arabic/ar_M_01;;  arabic/f)  echo prompts/arabic/ar_F_01;;
+  # Arabic: held-out GlobalPhone speakers (must match l1base in submit_indic_ckpt_grid.sh).
+  arabic/m)  echo prompts/arabic/ar_M_AR010;;  arabic/f)  echo prompts/arabic/ar_F_AR002;;
 esac; }
 gdir() { [ "$1" = f ] && echo female || echo male; }   # speaker -> GT gender dir
 
