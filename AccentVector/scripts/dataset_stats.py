@@ -11,10 +11,12 @@ Two sources, same table:
 
   --clips  a prep output dir on scratch, e.g.
            /exports/eddie/scratch/s2247837/data/aishell_clips
-           Picks the last-stage manifest present (see MANIFEST_PREFERENCE) and joins
-           it to details.tsv on the clip path -- so durations and speaker counts come
-           for free, no audio decoding. Rows dropped by the DNSMOS filter (and, for
-           indic, by romanisation) are excluded, exactly as at training time.
+           Picks the last-stage manifest present (ACCENT_MANIFEST, then
+           MANIFEST_PREFERENCE) and joins it to details.tsv on the clip path -- so
+           durations and speaker counts come for free, no audio decoding. Rows
+           dropped by the DNSMOS filter (and, for indic, by romanisation) are
+           excluded, exactly as at training time. Any metadata*.csv it does not
+           recognise is reported, so an ad-hoc manifest cannot pass unnoticed.
 
   --data-root  the *prepared* datasets ($F5_ROOT/data/<accent>_pinyin), whose
            {train,valid}_duration.json are what the trainer literally loaded. Use
@@ -53,6 +55,17 @@ VAL_FRAC = 0.1  # accent_vector.data_preprocess.prepare_dataset default
 # last pipeline stage first -- see from_clips()
 MANIFEST_PREFERENCE = ("metadata.roman.csv", "metadata.dnsmos.csv", "metadata.csv")
 
+# Manifests that no prep script in this repo generates, so the stage-order probe
+# above cannot find them: built ad hoc on Eddie and passed to the finetune by hand.
+# Keyed by accent AND by clips-dir name, since --provenance yields the training
+# ACCENT_NAME (mandarin) while --clips yields the directory (aishell_clips).
+#   mandarin: AISHELL-1 subsampled to ~50 h and cleaned, on top of the usual
+#             prep_aishell_from_zips.py -> dnsmos_filter.py chain.
+ACCENT_MANIFEST = {
+    "mandarin": "metadata.50h.clean.csv",
+    "aishell": "metadata.50h.clean.csv",
+}
+
 
 def read_manifest(path):
     """Ordered clip paths from a `audio_file|text` manifest (prepare's row order)."""
@@ -62,31 +75,42 @@ def read_manifest(path):
         return [row[0].strip() for row in r if len(row) >= 2]
 
 
-def from_clips(clips_dir, manifest=None):
-    """(durations in manifest order, speaker set, n_missing_from_details, manifest path).
+def from_clips(clips_dir, manifest=None, accent=None):
+    """(durations in manifest order, speakers, n_missing_from_details, manifest, unknown).
+
+    `unknown` lists metadata*.csv files the auto-detect does not recognise -- an
+    ad-hoc manifest the finetune may well have used, which the caller should
+    surface rather than silently ignore. Empty when `manifest` was given.
 
     details.tsv is written by every prep script (cgn / indicvoices / aishell /
     globalphone) with at least clip, speaker, dur -- keyed on the same
     `wavs/<name>` path the manifest uses.
     """
     clips_dir = Path(clips_dir)
+    unknown = []
     if manifest:
         man_path = Path(manifest)
         if not man_path.exists():
             raise FileNotFoundError(f"no such manifest: {man_path}")
     else:
         # The finetune is handed a DIFFERENT manifest per language, so guessing
-        # wrong silently changes the answer. Probe in the order the prep pipelines
-        # produce them, last-stage first: indic runs romanise AFTER DNSMOS and
-        # drops rows that romanise to empty (romanize.py), so metadata.roman.csv
-        # -- not metadata.dnsmos.csv -- is what those finetunes consumed.
-        # Prefer --provenance to skip guessing entirely.
-        for name in MANIFEST_PREFERENCE:
+        # wrong silently changes the answer. Try this accent's known ad-hoc name
+        # first, then the order the prep pipelines produce them, last stage first:
+        # indic runs romanise AFTER DNSMOS and drops rows that romanise to empty
+        # (romanize.py), so metadata.roman.csv -- not metadata.dnsmos.csv -- is
+        # what those finetunes consumed.  Prefer --provenance to skip guessing.
+        preference = list(MANIFEST_PREFERENCE)
+        pinned = ACCENT_MANIFEST.get(accent)
+        if pinned:
+            preference.insert(0, pinned)
+        for name in preference:
             man_path = clips_dir / name
             if man_path.exists():
                 break
         else:
             raise FileNotFoundError(f"no manifest under {clips_dir}")
+        unknown = sorted(p.name for p in clips_dir.glob("metadata*.csv")
+                         if p.name not in preference)
 
     det_path = clips_dir / "details.tsv"
     if not det_path.exists():
@@ -113,7 +137,7 @@ def from_clips(clips_dir, manifest=None):
             speakers.add(hit[1])
     if not durations:
         raise RuntimeError(f"{clips_dir}: manifest and details.tsv share no clips")
-    return durations, speakers, missing, man_path
+    return durations, speakers, missing, man_path, unknown
 
 
 def read_provenance(prov_dir):
@@ -291,7 +315,8 @@ def main():
 
     for name in sorted(targets):
         try:
-            durations, speakers, missing, man_path = from_clips(targets[name], manifests.get(name))
+            durations, speakers, missing, man_path, unknown = from_clips(
+                targets[name], manifests.get(name), name)
         except (FileNotFoundError, RuntimeError) as e:
             print(f"! {name}: {e}")
             continue
@@ -304,6 +329,10 @@ def main():
         if name not in manifests:
             notes.append(f"{name}: manifest auto-detected as {man_path.name} "
                          "(not from a job record -- confirm with --provenance)")
+        if unknown:
+            notes.append(f"{name}: unrecognised manifest(s) also present ({', '.join(unknown)}); "
+                         f"counted {man_path.name}. If the finetune used another, pass "
+                         f"--manifest {name}=PATH")
         if missing:
             notes.append(f"{name}: {missing} manifest clips absent from details.tsv, excluded")
 
