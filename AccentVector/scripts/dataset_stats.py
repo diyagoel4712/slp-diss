@@ -3,22 +3,32 @@
 
 Two sources, same table:
 
-  --clips  (usual case) a prep output dir on scratch, e.g.
+  --provenance  (best) $CKPT_ROOT/provenance, where eddie_finetune_lora.sh records
+           the accent + METADATA_CSV + AUDIO_ROOT of every job it ran. Each language
+           is fine-tuned from a DIFFERENTLY NAMED csv -- Dutch/Mandarin/Arabic from
+           metadata.dnsmos.csv, Hindi/Bengali from metadata.roman.csv -- so this is
+           the only source that needs no guessing about which file to count.
+
+  --clips  a prep output dir on scratch, e.g.
            /exports/eddie/scratch/s2247837/data/aishell_clips
-           Reads the DNSMOS-filtered manifest (metadata.dnsmos.csv, falling back to
-           metadata.csv) and joins it to details.tsv on the clip path -- so durations
-           and speaker counts come for free, no audio decoding. Rows dropped by the
-           DNSMOS filter are excluded, exactly as at training time.
+           Picks the last-stage manifest present (see MANIFEST_PREFERENCE) and joins
+           it to details.tsv on the clip path -- so durations and speaker counts come
+           for free, no audio decoding. Rows dropped by the DNSMOS filter (and, for
+           indic, by romanisation) are excluded, exactly as at training time.
 
   --data-root  the *prepared* datasets ($F5_ROOT/data/<accent>_pinyin), whose
            {train,valid}_duration.json are what the trainer literally loaded. Use
-           these to double-check --clips: they additionally exclude the handful of
+           these to double-check the above: they additionally exclude the handful of
            rows prepare drops for missing/unreadable audio.
 
+    python scripts/dataset_stats.py --provenance $CKPT_ROOT/provenance
     python scripts/dataset_stats.py --clips /exports/eddie/scratch/s2247837/data/*_clips
-    python scripts/dataset_stats.py --clips dutch=/path/cgn_dutch_clips
-    python scripts/dataset_stats.py --clips /path/*_clips --steps dutch=60000
+    python scripts/dataset_stats.py --clips hindi=/path/iv_hindi_clips \
+        --manifest hindi=/path/iv_hindi_clips/metadata.roman.csv
+    python scripts/dataset_stats.py --provenance $CKPT_ROOT/provenance --steps dutch=60000
     python scripts/dataset_stats.py --data-root $F5_ROOT/data
+
+The `manifest` column always reports which csv each row was counted from.
 
 With --steps it also reports how much audio each run *consumed*: the frame batch
 sampler packs clips into ~102 s batches, so a step count alone does not tell you
@@ -40,6 +50,9 @@ SAMPLE_RATE = 24000
 SEC_PER_FRAME = HOP_LENGTH / SAMPLE_RATE  # 10.67 ms
 VAL_FRAC = 0.1  # accent_vector.data_preprocess.prepare_dataset default
 
+# last pipeline stage first -- see from_clips()
+MANIFEST_PREFERENCE = ("metadata.roman.csv", "metadata.dnsmos.csv", "metadata.csv")
+
 
 def read_manifest(path):
     """Ordered clip paths from a `audio_file|text` manifest (prepare's row order)."""
@@ -50,7 +63,7 @@ def read_manifest(path):
 
 
 def from_clips(clips_dir, manifest=None):
-    """(durations in manifest order, speaker set, n_missing_from_details).
+    """(durations in manifest order, speaker set, n_missing_from_details, manifest path).
 
     details.tsv is written by every prep script (cgn / indicvoices / aishell /
     globalphone) with at least clip, speaker, dur -- keyed on the same
@@ -59,12 +72,21 @@ def from_clips(clips_dir, manifest=None):
     clips_dir = Path(clips_dir)
     if manifest:
         man_path = Path(manifest)
-    else:
-        man_path = clips_dir / "metadata.dnsmos.csv"
         if not man_path.exists():
-            man_path = clips_dir / "metadata.csv"
-    if not man_path.exists():
-        raise FileNotFoundError(f"no manifest under {clips_dir}")
+            raise FileNotFoundError(f"no such manifest: {man_path}")
+    else:
+        # The finetune is handed a DIFFERENT manifest per language, so guessing
+        # wrong silently changes the answer. Probe in the order the prep pipelines
+        # produce them, last-stage first: indic runs romanise AFTER DNSMOS and
+        # drops rows that romanise to empty (romanize.py), so metadata.roman.csv
+        # -- not metadata.dnsmos.csv -- is what those finetunes consumed.
+        # Prefer --provenance to skip guessing entirely.
+        for name in MANIFEST_PREFERENCE:
+            man_path = clips_dir / name
+            if man_path.exists():
+                break
+        else:
+            raise FileNotFoundError(f"no manifest under {clips_dir}")
 
     det_path = clips_dir / "details.tsv"
     if not det_path.exists():
@@ -91,7 +113,39 @@ def from_clips(clips_dir, manifest=None):
             speakers.add(hit[1])
     if not durations:
         raise RuntimeError(f"{clips_dir}: manifest and details.tsv share no clips")
-    return durations, speakers, missing, man_path.name
+    return durations, speakers, missing, man_path
+
+
+def read_provenance(prov_dir):
+    """{accent: (metadata_csv, clips_dir)} from record_provenance.sh output.
+
+    eddie_finetune_lora.sh writes one ft.<job>.<stamp>.txt per run under
+    $CKPT_ROOT/provenance/, holding the exact accent= / METADATA_CSV= / AUDIO_ROOT=
+    the job ran with. Newest file per accent wins; conflicts are reported.
+    """
+    prov_dir = Path(prov_dir)
+    files = sorted(prov_dir.glob("ft.*.txt"))
+    if not files:
+        raise FileNotFoundError(f"no ft.*.txt under {prov_dir}")
+
+    runs, conflicts = {}, {}
+    for f in files:  # sorted by name = job/timestamp order, so later runs overwrite
+        fields = {}
+        for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+            for token in ("accent=", "METADATA_CSV=", "AUDIO_ROOT="):
+                if line.startswith(token) or f"  {token}" in line:
+                    val = line.split(token, 1)[1].split("  ")[0].strip()
+                    fields[token.rstrip("=")] = val
+        accent, csv_path = fields.get("accent"), fields.get("METADATA_CSV")
+        if not accent or accent == "?" or not csv_path or csv_path == "?":
+            continue
+        audio_root = fields.get("AUDIO_ROOT")
+        clips = Path(audio_root) if audio_root and audio_root != "?" else Path(csv_path).parent
+        prev = runs.get(accent)
+        if prev and prev[0] != csv_path:
+            conflicts.setdefault(accent, {prev[0]}).add(csv_path)
+        runs[accent] = (csv_path, clips)
+    return runs, conflicts
 
 
 def from_prepared(data_dir):
@@ -178,9 +232,13 @@ def main():
     ap.add_argument("--clips", nargs="*", default=[], metavar="[ACCENT=]DIR",
                     help="prep output dir(s); bare paths are named from the dir "
                          "(aishell_clips -> aishell). Globs fine.")
+    ap.add_argument("--provenance", default=None, metavar="DIR",
+                    help="$CKPT_ROOT/provenance -- take each accent's METADATA_CSV "
+                         "(and clips dir) from what the finetune job recorded. "
+                         "Best source: no guessing about per-language CSV names.")
     ap.add_argument("--manifest", nargs="*", default=[], metavar="ACCENT=PATH",
-                    help="override the manifest for an accent (default: "
-                         "metadata.dnsmos.csv, else metadata.csv)")
+                    help="override the manifest for an accent (default: first of "
+                         + ", ".join(MANIFEST_PREFERENCE) + " found in the clips dir)")
     ap.add_argument("--data-root", default=None,
                     help="dir holding <accent>_pinyin/ (default: $F5_ROOT/data)")
     ap.add_argument("--accents", nargs="*", default=None,
@@ -206,6 +264,8 @@ def main():
     steps, manifests = kv(args.steps, int), kv(args.manifest)
     rows, notes = [], []
 
+    # accent -> clips dir, from --clips (explicit or named after the dir)
+    targets = {}
     for spec in args.clips:
         name, _, path = spec.partition("=")
         if not path:
@@ -213,20 +273,41 @@ def main():
             for suffix in ("_clips", "_wavs"):
                 if name.endswith(suffix):
                     name = name[: -len(suffix)]
+        targets[name] = path
+
+    if args.provenance:
         try:
-            durations, speakers, missing, man_name = from_clips(path, manifests.get(name))
+            runs, conflicts = read_provenance(args.provenance)
+        except FileNotFoundError as e:
+            ap.error(str(e))
+        for accent, (csv_path, clips) in runs.items():
+            manifests.setdefault(accent, csv_path)  # --manifest still wins
+            targets.setdefault(accent, str(clips))  # as does an explicit --clips dir
+        for accent, seen in conflicts.items():
+            notes.append(f"{accent}: runs used different manifests ({', '.join(sorted(seen))}); "
+                         f"took the newest -- pass --manifest {accent}=PATH to pin another")
+        if not runs:
+            notes.append(f"no usable accent=/METADATA_CSV= records under {args.provenance}")
+
+    for name in sorted(targets):
+        try:
+            durations, speakers, missing, man_path = from_clips(targets[name], manifests.get(name))
         except (FileNotFoundError, RuntimeError) as e:
             print(f"! {name}: {e}")
             continue
         train, valid = split_like_prepare(durations)
-        rows.append(describe(name, durations, train, valid, speakers, steps.get(name),
-                             args.frames_per_batch, args.max_samples))
-        if man_name != "metadata.dnsmos.csv":
-            notes.append(f"{name}: used {man_name} (no DNSMOS-filtered manifest found)")
+        row = describe(name, durations, train, valid, speakers, steps.get(name),
+                       args.frames_per_batch, args.max_samples)
+        # the manifest IS the answer to "how much data" -- always show which one
+        row["manifest"] = man_path.name
+        rows.append(row)
+        if name not in manifests:
+            notes.append(f"{name}: manifest auto-detected as {man_path.name} "
+                         "(not from a job record -- confirm with --provenance)")
         if missing:
             notes.append(f"{name}: {missing} manifest clips absent from details.tsv, excluded")
 
-    if args.data_root or not args.clips:
+    if args.data_root or not (args.clips or args.provenance):
         root = Path(args.data_root or os.environ.get("F5_ROOT")
                     or Path(__file__).resolve().parents[2] / "F5-TTS")
         data_root = root if root.name == "data" else root / "data"
@@ -243,8 +324,8 @@ def main():
                 valid, train = durations[: len(durations) - n_train], durations[len(durations) - n_train:]
                 rows.append(describe(f"{name} (prepared)", durations, train, valid, None,
                                      steps.get(name), args.frames_per_batch, args.max_samples))
-        elif not args.clips:
-            ap.error(f"no such data dir: {data_root} (pass --clips or --data-root)")
+        elif not (args.clips or args.provenance):
+            ap.error(f"no such data dir: {data_root} (pass --clips/--provenance or --data-root)")
 
     if not rows:
         return
@@ -253,6 +334,8 @@ def main():
             "min_s", "max_s", "steps_per_epoch", "epoch_h", "oversized"]
     if any("speakers" in r for r in rows):
         cols.insert(2, "speakers")
+    if any("manifest" in r for r in rows):
+        cols.append("manifest")
     if any("steps" in r for r in rows):
         cols += ["steps", "epochs", "seen_h"]
 
