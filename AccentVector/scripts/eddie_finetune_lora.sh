@@ -10,7 +10,7 @@
 #
 #$ -N ft_accent
 #$ -cwd
-#$ -q gpu,gpu_new    # gpu queue was fully disabled 2026-08; gpu_new holds current GPU capacity. Both listed so it survives gpu being re-enabled.
+#$ -q gpu    
 #$ -l gpu=1            
 #$ -l h_rt=24:00:00         
 #$ -l h_vmem=96G           # VIRTUAL mem ceiling; CUDA reserves ~50G vmem/process (real RSS <10G). Keep generous.
