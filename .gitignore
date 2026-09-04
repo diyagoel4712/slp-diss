@@ -236,6 +236,8 @@ Evaluation/GenAID/
 CLARITY/
 F5-TTS/
 Expressive-Vectors/
+qualtreats/
+lang2vec/
 
 # Model checkpoints / weights (in case any live outside the clones)
 **/pretrained_models/
@@ -248,7 +250,8 @@ Expressive-Vectors/
 
 # Generated audio outputs
 outputs/
-samples/
+training-samples/
+listening-tests/audio-clips/
 
 # Generated evaluation artifacts (reproducible via Evaluation/run_pipeline.sh)
 Evaluation/evaluation_results.csv
