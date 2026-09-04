@@ -225,7 +225,6 @@ __marimo__/
 .DS_Store
 
 # Raw datasets / corpora (VCTK etc.) — far too large for git
-vctk/
 arctic.data
 
 # Third-party model repos cloned for experiments (each has its own .git;
@@ -252,6 +251,9 @@ lang2vec/
 outputs/
 training-samples/
 listening-tests/audio-clips/
+AccentVector/prompts/
+AccentVector/ground_truth_refs/
+AccentVector/logs/
 
 # Generated evaluation artifacts (reproducible via Evaluation/run_pipeline.sh)
 Evaluation/evaluation_results.csv
@@ -264,3 +266,4 @@ Preliminary_test_results/
 
 # Guidance
 research-hypotheses.pdf
+B209547_SLP_Dissertation.pdf
