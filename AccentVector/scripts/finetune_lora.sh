@@ -25,7 +25,7 @@ export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 
 ACCENT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}
-export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR:${PYTHONPATH:-}"
+export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR/src:${PYTHONPATH:-}"
 
 CKPT_ROOT=${CKPT_ROOT:?set CKPT_ROOT (e.g. exps locally, or scratch on the HPC -- the eddie wrapper sets it)}
 

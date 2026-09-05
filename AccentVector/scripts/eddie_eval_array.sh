@@ -37,7 +37,7 @@ export GENAID_PYTHON="$(conda run -n "$GENAID_ENV" which python)"
 UTMOS_PYTHON="$(conda run -n "$UTMOS_ENV" which python)"
 
 conda activate "$EVAL_ENV"
-export PYTHONPATH="$ACCENT_DIR:$EVAL_DIR:${PYTHONPATH:-}"
+export PYTHONPATH="$ACCENT_DIR/src:$EVAL_DIR:${PYTHONPATH:-}"
 
 MANIFEST="${1:?pass the task manifest (TSV) as arg 1}"
 [ -f "$MANIFEST" ] || { echo "manifest not found: $MANIFEST" >&2; exit 1; }
@@ -60,13 +60,13 @@ for f in "$SWEEP_DIR" "$TRANSCRIPTS" "$REF_WAV"; do
 done
 
 # --- RQ1 (+ leakage/LID). cs_accent only when a GT dir is present. ---
-python -m accent_vector.experiments.rq1_reproduction \
+python -m accent_vector.score_sweep \
   --sweep-dir "$SWEEP_DIR" --transcripts "$TRANSCRIPTS" --ref-wav "$REF_WAV" --lid \
   ${GT_DIR:+--accent-ref "$GT_DIR"} --out-csv "$METRICS_DIR/rq1.csv"
 
 # --- RQ3 decomposition: needs natural target-accent clips. ---
 if [ -n "${GT_DIR:-}" ]; then
-  python -m accent_vector.experiments.rq3_decomposition \
+  python -m accent_vector.score_prosody \
     --sweep-dir "$SWEEP_DIR" --natural-ref "$GT_DIR" --out-csv "$METRICS_DIR/rq3.csv"
 else
   echo "  [rq3] skipped (no GT_DIR for $ACCENT/$SPEAKER)"

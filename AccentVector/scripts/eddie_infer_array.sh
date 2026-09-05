@@ -49,7 +49,7 @@ export ACCENT_NAME="$ACCENT"
 export SPEAKER REF_KIND REF_AUDIO RUN_DIR SHARD_INDEX SHARD_COUNT
 export CONFIG="$RUN_DIR/config.yaml"
 export VOCAB="$RUN_DIR/vocab.txt"
-export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR:${PYTHONPATH:-}"
+export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR/src:${PYTHONPATH:-}"
 
 # per-row VECTOR (col 9) overrides the accent's final vector -- e.g. a training checkpoint.
 # A full model_<step>.pt is sliced to its LoRA vector on the fly; a lora_<step>.pt snapshot

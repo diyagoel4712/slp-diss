@@ -5,7 +5,7 @@
 set -euo pipefail
 
 ACCENT_DIR=$(cd "$(dirname "$0")/.." && pwd)
-export PYTHONPATH="$ACCENT_DIR:${PYTHONPATH:-}"
+export PYTHONPATH="$ACCENT_DIR/src:${PYTHONPATH:-}"
 export KMP_DUPLICATE_LIB_OK=TRUE   # avoid the libomp double-init crash on macOS
 
 # Pinned so this always runs from the eval env regardless of whatever conda env

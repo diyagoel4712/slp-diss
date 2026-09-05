@@ -6,7 +6,7 @@ export CUDA_VISIBLE_DEVICES=0
 
 ACCENT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}
-export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR:${PYTHONPATH:-}"
+export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR/src:${PYTHONPATH:-}"
 
 ACCENT_NAME=${ACCENT_NAME:-british}
 PRETRAIN=${PRETRAIN:-"$F5_ROOT/ckpts/F5TTS_v1_Base/model_1250000.pt"}
