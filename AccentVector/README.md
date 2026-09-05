@@ -41,7 +41,7 @@ set up in `Preliminary_test_results/f5-tts`). Two consequences:
      vector *is* the LoRA branch, scaled natively by `lora_alpha` (no merge).
      The whole analysis pipeline runs on it — `infer_accent --lora` (and
      `grid --lora`) build the base+LoRA model **once** and rescale the branch per
-     alpha in place (`accent_vector/lora_model.py`), feeding RQ1–RQ3, plus the RQ2
+     alpha in place (`src/accent_vector/lora_model.py`), feeding RQ1–RQ3, plus the RQ2
      trajectory tooling (`sample_checkpoints.py`, `rq2_temporal --lora`,
      `viz_temporal`). This is the paper-matching, default track.
    - **Full fine-tune** (`finetune.sh`, `F5TTS_v1_Base`): the path
@@ -165,19 +165,25 @@ See [EXPERIMENTS.md](EXPERIMENTS.md) → *Data* for the full breakdown.
 ## Layout
 
 ```
-accent_vector/
-  data_preprocess.py   VCTK -> metadata.csv -> F5 Arrow dataset
-  extract_vector.py    task-vector extract (Eq. 1-3) + arithmetic (Eq. 4-6)
-  infer_accent.py      alpha-sweep / single-ckpt inference, fixed native-L1 ref
-  evaluate.py          scores a sweep via the Evaluation/ eval suite
-  sample_checkpoints.py  RQ2: synthesise a fixed prompt at every LoRA snapshot
-  experiments/         dissertation RQ harness (see EXPERIMENTS.md);
-                       grid, rq1_reproduction, rq5_geometry, rq3_decomposition,
-                       rq3_layers, rq2_temporal, viz_temporal, shared
-scripts/               finetune(.sh) / finetune_lora(.sh) / extract / infer /
-                       evaluate wrappers
-transcripts/           held-out English eval transcripts (10 CMU ARCTIC sents)
-main.py                unified dispatcher over the core stages (data/vector/infer/evaluate)
+src/accent_vector/       the importable package -- src layout, so PYTHONPATH=src
+  data_preprocess.py     corpus -> metadata.csv -> F5 Arrow dataset
+  extract_vector.py      task-vector extract (Eq. 1-3) + arithmetic (Eq. 4-6)
+  lora_model.py          base+LoRA build; scales the branch in place (Eq. 4)
+  infer_accent.py        alpha-sweep / single-ckpt inference
+  score_sweep.py         -> rq1.csv: accent, identity, WER, P(English), onsets
+  score_prosody.py       -> rq3.csv: segmental (PPG-KL) + suprasegmental
+  shared.py              eval-suite bridge, sweep IO, geometry, threshold onset
+  evaluate.py            scores a sweep via the Evaluation/ suite
+  sample_checkpoints.py  synthesise a fixed prompt at every LoRA snapshot
+  experiments/           unfinished analyses, kept for the write-up (see its
+                         __init__.py: none of them has produced output)
+scripts/                 finetune / extract / infer / evaluate wrappers and the
+                         Eddie array jobs (these export PYTHONPATH=$ACCENT_DIR/src)
+notebooks/               dissertation_figures.ipynb -- every figure, by RQ
+transcripts/             held-out English eval transcripts
+prompts/, ground_truth_refs/   per-accent reference clips and natural targets
+main.py                  dispatcher (data/vector/infer/evaluate/score-sweep/
+                         score-prosody); adds src/ to sys.path itself
 ```
 
 `data/`, `vectors/`, `results/`, `refs/`, and any F5 checkpoints are generated

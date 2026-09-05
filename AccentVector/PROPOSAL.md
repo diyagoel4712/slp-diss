@@ -3,7 +3,7 @@
 **Examining the generalisability of the task vector approach for accented zero-shot TTS**
 
 An MSc dissertation building on the [Accent Vector on F5-TTS](README.md)
-port. Experiment code lives in [`accent_vector/experiments/`](accent_vector/experiments);
+port. Experiment code lives in [`src/accent_vector/experiments/`](src/accent_vector/experiments);
 the runnable mapping is in [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## Motivation

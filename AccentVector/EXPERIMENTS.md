@@ -9,7 +9,7 @@ all `rq*` modules run on the Mac against the grid's audio.
 | ID | What | How |
 |----|------|-----|
 | A0 | One LoRA fine-tune → one vector per accent `{british, spanish, vietnamese, +1 distant}` | `scripts/finetune_lora.sh` per accent; the vector is the final `lora_<step>.pt` snapshot (point the grid at it) |
-| A1 | Synthesis grid: accent × **speaker** × α sweep, each speaker's **native-language (L1) reference** held fixed across α → `results/<accent>/<speaker>/alpha_<a>/` | `python -m accent_vector.experiments.grid --config grid.json --lora` |
+| A1 | Synthesis grid: accent × **speaker** × α sweep, each speaker's **native-language (L1) reference** held fixed across α → `results/<accent>/<speaker>/alpha_<a>/` | `bash scripts/submit_dutch_ckpt_grid.sh` (login node -> `eddie_infer_array.sh` -> `infer_sweep.sh` -> `accent_vector.infer_accent`) |
 | A2 | Natural target-accent clips + GAE baseline clips (per speaker) | data collection; endpoints for gap-closure / cs_accent |
 
 (Full-fine-tune track instead: `scripts/finetune.sh` → `scripts/extract_vector.sh` → `grid` without `--lora`, which merges each alpha.)
@@ -53,18 +53,18 @@ trees `results/<accent>/{l1,native}/`; via the Eddie wrapper set `REF_KIND=l1|na
 
 | ID | RQ | Module | Output | Confirms hypothesis if |
 |----|----|--------|--------|------------------------|
-| E1.1 | RQ1 | `rq1_reproduction` | `rq1.csv` | accent (`accent_cs`) ↑ monotonic with α (Spearman>0), spk-sim flat/high |
-| E1.2 | RQ1 | `rq1_reproduction` (wer col) | `rq1.csv` | WER rises with α faster than paper's XTTS (leakage) |
-| E1.3 | RQ1 | `rq1_reproduction --lid` (eng_lid col) | `rq1.csv` | P(English) falls with α — direct language drift, distinct from accent |
-| E1.4 | RQ1 | `rq1_reproduction` (leak-onset in footer) | `rq1.csv` | leakage-onset α lower on F5 than XTTS (missing language anchor) |
-| E1.5 | RQ1 | `rq1_reproduction` on **both** reference passes (`{l1,native}/`) | `rq1.csv` ×2 | accent ↑ with α under the **neutral** reference ⇒ vector adds accent independent of the reference; flat/leaky ⇒ L1-condition accent was cloning (valid negative result) |
+| E1.1 | RQ1 | `score_sweep` | `rq1.csv` | accent (`accent_cs`) ↑ monotonic with α (Spearman>0), spk-sim flat/high |
+| E1.2 | RQ1 | `score_sweep` (wer col) | `rq1.csv` | WER rises with α faster than paper's XTTS (leakage) |
+| E1.3 | RQ1 | `score_sweep --lid` (eng_lid col) | `rq1.csv` | P(English) falls with α — direct language drift, distinct from accent |
+| E1.4 | RQ1 | `score_sweep` (leak-onset in footer) | `rq1.csv` | leakage-onset α lower on F5 than XTTS (missing language anchor) |
+| E1.5 | RQ1 | `score_sweep` on **both** reference passes (`{l1,native}/`) | `rq1.csv` ×2 | accent ↑ with α under the **neutral** reference ⇒ vector adds accent independent of the reference; flat/leaky ⇒ L1-condition accent was cloning (valid negative result) |
 | E2.1 | RQ2 | `rq2_temporal` | `temporal.csv` | `cos(τ_t, τ_final)` converges before magnitude (direction learnable early) |
-| E2.2 | RQ2×RQ1 | `checkpoint_grid` → `rq1_reproduction` per step → `rq2_behavioural` | `by_step_summary.csv`, `*_by_step_alpha.csv`, `matched_alpha_trends.csv` | accent (`accent_cs`) saturates with step at low-mid α while `wer` rises and `wer_leak_onset` **falls** with step ⇒ accent learned before language; earlier checkpoint + moderate α is the fluent-accented sweet spot |
-| E3.1 | RQ3 | `rq3_decomposition` (seg cols) | `rq3.csv` | PPG-KL-to-natural falls with α |
-| E3.2 | RQ3 | `rq3_decomposition` (supra cols) | `rq3.csv` | F0/rhythm move little toward natural |
-| E3.3 | RQ3 | `rq3_decomposition` (closure) | `rq3.csv` | seg_closure ≫ supra_closure_mean, widest for distant accent |
+| E2.2 | RQ2×RQ1 | `submit_*_ckpt_grid.sh` → `score_sweep` per step → `experiments/rq2_behavioural` | `by_step_summary.csv`, `*_by_step_alpha.csv`, `matched_alpha_trends.csv` | accent (`accent_cs`) saturates with step at low-mid α while `wer` rises and `wer_leak_onset` **falls** with step ⇒ accent learned before language; earlier checkpoint + moderate α is the fluent-accented sweet spot |
+| E3.1 | RQ3 | `score_prosody` (seg cols) | `rq3.csv` | PPG-KL-to-natural falls with α |
+| E3.2 | RQ3 | `score_prosody` (supra cols) | `rq3.csv` | F0/rhythm move little toward natural |
+| E3.3 | RQ3 | `score_prosody` (closure) | `rq3.csv` | seg_closure ≫ supra_closure_mean, widest for distant accent |
 | E3.4 | RQ3 | `rq3_layers` | `rq3_layers.csv` | accent energy concentrates in identifiable modules/depth |
-| E4.1 | RQ4* | `infer_accent --include-layers/--exclude-layers` (LoRA-native mask) or `extract_vector compose --include` (merged) → `rq3_decomposition` | `rq3.csv` | scaling only accent layers (e.g. `--exclude-layers text_embed input_embed`) keeps English fluent (wer flat) while raising accent; up-weighting prosody layers raises supra_closure |
+| E4.1 | RQ4* | `infer_accent --include-layers/--exclude-layers` (LoRA-native mask) or `extract_vector compose --include` (merged) → `score_prosody` | `rq3.csv` | scaling only accent layers (e.g. `--exclude-layers text_embed input_embed`) keeps English fluent (wer flat) while raising accent; up-weighting prosody layers raises supra_closure |
 | E5.1 | RQ5 | `rq5_geometry` | `weight_space_cosine.csv`, `..._mds.csv` | accents cluster by family in MDS |
 | E5.2 | RQ5 | `rq5_geometry` (--synth) | `output_space_cosine.csv`, `rsa_mantel.txt` | Mantel r>0, p<0.05 but r<1 (imperfect) |
 | E5.3 | RQ5 | `rq5_geometry` (within- vs cross-English) | matrices | corpus contributes measurable distance |
@@ -76,7 +76,7 @@ error bounds) is out of scope — step ≠ data amount.
 
 ## Not yet wired (documented integration points)
 
-- **LID probability** (E1.3) — **wired.** `rq1_reproduction --lid` calls
+- **LID probability** (E1.3) — **wired.** `score_sweep --lid` calls
   `evaluation_functions.predict_lid_english`, which runs VoxLingua107
   (`speechbrain/lang-id-voxlingua107-ecapa`) in the isolated `genaid` env via the
   `recipes/CommonAccent/predict_lid.py` wrapper and returns P(English) per clip →
@@ -91,19 +91,21 @@ error bounds) is out of scope — step ≠ data amount.
 ## Typical run order
 
 ```bash
-# after A0 produces the LoRA snapshots and a grid.json listing them:
-python -m accent_vector.experiments.grid --config grid.json --lora             # A1 -> results/<accent>/<speaker>/
+# after A0 produces the LoRA snapshots: submit the checkpoint x alpha grid.
+# (accent_vector.experiments.grid was the standalone driver for this and is gone;
+#  the Eddie array does the job -- see scripts/submit_<accent>_ckpt_grid.sh)
+bash scripts/submit_dutch_ckpt_grid.sh      # A1 -> results/<accent>/<ref>/<spk>/audio/step_<n>/alpha_<a>/
 
 # E1 + E3 (core): score each speaker with ITS own L1 reference + natural clips, then pool
 for s in results/indian/*/; do sp=$(basename "$s")
-  python -m accent_vector.experiments.rq1_reproduction --sweep-dir "$s" \
+  python -m accent_vector.score_sweep --sweep-dir "$s" \
       --transcripts transcripts/eval_transcripts.txt --ref-wav refs/indian/$sp.wav \
       --accent-ref natural/indian/$sp --lid --out-csv "$s/rq1.csv"
-  python -m accent_vector.experiments.rq3_decomposition --sweep-dir "$s" \
+  python -m accent_vector.score_prosody --sweep-dir "$s" \
       --natural-ref natural/indian/$sp --out-csv "$s/rq3.csv"
 done
-python -m accent_vector.experiments.aggregate --accent-dir results/indian --csv-name rq1.csv --out-dir results/indian
-python -m accent_vector.experiments.aggregate --accent-dir results/indian --csv-name rq3.csv --out-dir results/indian
+python -m accent_vector.experiments.aggregate   # unrun, see experiments/__init__.py --accent-dir results/indian --csv-name rq1.csv --out-dir results/indian
+python -m accent_vector.experiments.aggregate   # unrun, see experiments/__init__.py --accent-dir results/indian --csv-name rq3.csv --out-dir results/indian
 
 python -m accent_vector.experiments.rq3_layers --vector vectors/indian.pt \
     --out-csv results/indian/rq3_layers.csv                                            # E3.4 (vector-only)
@@ -118,7 +120,7 @@ python -m accent_vector.experiments.rq2_temporal --lora \
 ### Layer-masked accent (E4.1) — "accent without the language"
 
 On the LoRA track the mask is native: `set_lora_alpha` zeroes the un-selected
-branches, so `infer_accent` (and `checkpoint_grid`) take `--include-layers` /
+branches, so `infer_accent` takes `--include-layers` /
 `--exclude-layers` (substrings over LoRA submodule names — `attn`, `ff`, `conv`,
 `text_embed`, `input_embed`, `lora_proj_out`, or a block index like `.5.`). Excluding
 the content/language path is the direct attack on the α=1 gibberish:
@@ -142,17 +144,11 @@ each checkpoint's sweep, score each, then collate at matched α — ideally agai
 
 ```bash
 # GPU: alpha sweep at several checkpoints -> results/dutch/native/by_step/step_<step>/
-python -m accent_vector.experiments.checkpoint_grid \
-    --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt \
-    --config <run>/config.yaml --vocab <run>/vocab.txt \
-    --snap-dir <run>/ckpts/snapshots --steps 5000,15000,25000,45000 \
-    --ref-audio refs/native_ga.wav --ref-text-file refs/native_ga.txt \
-    --transcripts transcripts/eval_transcripts.txt --alphas 0,0.25,0.5,0.75,1.0 \
-    --out-root results/dutch/native/by_step
+STEP_INTERVAL=5000 REF_KINDS=native bash scripts/submit_dutch_ckpt_grid.sh
 
 # CPU: score each checkpoint, then compare matched-alpha across training
 for s in results/dutch/native/by_step/step_*/; do
-  python -m accent_vector.experiments.rq1_reproduction --sweep-dir "$s" \
+  python -m accent_vector.score_sweep --sweep-dir "$s" \
     --transcripts transcripts/eval_transcripts.txt --ref-wav refs/native_ga.wav \
     --accent-ref natural/dutch --lid --out-csv "$s/rq1.csv"
 done
