@@ -77,11 +77,14 @@ path (as compared to full finetuning) you need this fork's `F5TTS_v1_LoRA`
 config; **stock `SWivid/F5-TTS` has no LoRA**, so only use it if you stick to the
 full fine-tune.
 
-> **Provenance of `F5-TTS/` (gitignored, not vendored).** It is the `f5_tts_lora`
+> **Provenance of `F5-TTS/` (git submodule).** It is a fork of the `f5_tts_lora`
 > subdirectory of <https://github.com/the-bird-F/Expressive-Vectors>, itself a
-> fork of <https://github.com/SWivid/F5-TTS> that adds LoRA (MIT licensed). To
-> reconstruct it: clone Expressive-Vectors and move `f5_tts_lora` to `F5-TTS/`.
-> (A copy of this note also lives in `F5-TTS/PROVENANCE.md`.)
+> fork of <https://github.com/SWivid/F5-TTS> that adds LoRA (MIT licensed). The
+> subtree was extracted to the repo root with `git subtree split`, pinned at
+> upstream `84a811e` (split base `e1da0f9`), with the AccentVector patches
+> committed on top. Clone this repo with `--recursive`, or run
+> `git submodule update --init` in an existing checkout. See
+> `F5-TTS/PROVENANCE.md` for the exact delta from upstream.
 
 ```bash
 conda create -n f5-tts python=3.11 -y && conda activate f5-tts

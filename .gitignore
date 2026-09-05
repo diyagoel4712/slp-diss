@@ -251,9 +251,6 @@ lang2vec/
 outputs/
 training-samples/
 listening-tests/audio-clips/
-AccentVector/prompts/
-AccentVector/ground_truth_refs/
-AccentVector/logs/
 
 # Generated evaluation artifacts (reproducible via Evaluation/run_pipeline.sh)
 Evaluation/evaluation_results.csv
