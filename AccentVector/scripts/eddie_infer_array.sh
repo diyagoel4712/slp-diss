@@ -81,7 +81,7 @@ export ALPHAS="${ALPHAS// /,}"
 # collide in the shared results/<accent> tree. Base-accent asset lookups are unaffected.
 # Audio lands under audio/ so the eval's CSVs can live in a sibling metrics/ tree (large
 # audio stays on Eddie/scratch; tiny metrics get pulled to the Mac). See eddie_eval_array.sh.
-export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT}${RESULTS_TAG:+/$RESULTS_TAG}/${REF_KIND}${SPEAKER:+/$SPEAKER}/audio${OUT_SUBDIR:+/$OUT_SUBDIR}"}
+export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/per-accent/${ACCENT}${RESULTS_TAG:+/$RESULTS_TAG}/${REF_KIND}${SPEAKER:+/$SPEAKER}/audio${OUT_SUBDIR:+/$OUT_SUBDIR}"}
 
 # REF_TEXT may be a literal or a file path (romanised L1 transcript file for hi/bn); cat if a file.
 if [ -f "$REF_TEXT" ]; then REF_TEXT="$(cat "$REF_TEXT")"

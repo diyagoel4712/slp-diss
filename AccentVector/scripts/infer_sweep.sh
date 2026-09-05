@@ -27,8 +27,8 @@ ALPHAS=${ALPHAS:-"0,0.25,0.5,0.75,1.0"}
 # native-language (L1) reference for this accent; REF_TEXT must be its transcript
 REF_AUDIO=${REF_AUDIO:-"$ACCENT_DIR/refs/england.wav"}
 REF_TEXT=${REF_TEXT:-"Some call me nature, others call me mother nature."}
-TRANSCRIPTS=${TRANSCRIPTS:-"$ACCENT_DIR/transcripts/eval_transcripts.txt"}
-OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}"}
+TRANSCRIPTS=${TRANSCRIPTS:-"$ACCENT_DIR/data/transcripts/eval_transcripts.txt"}
+OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/per-accent/${ACCENT_NAME}"}
 # transcript sharding for multi-GPU fan-out: render only indices == SHARD_INDEX (mod
 # SHARD_COUNT), keeping the global utt#### name so shards reassemble into one alpha_<a>/.
 SHARD_INDEX=${SHARD_INDEX:-0}

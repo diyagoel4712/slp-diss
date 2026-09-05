@@ -15,7 +15,7 @@ Then set l1base() mandarin/m|f in AccentVector/scripts/submit_indic_ckpt_grid.sh
 mandarin_<M|F>_<spk> basenames.
 
   python extract_aishell_prompts.py --root <aishell1_src> \
-      --out ../../../AccentVector/prompts/mandarin        # auto-pick --n-per-gender each
+      --out ../../../AccentVector/data/prompts/mandarin        # auto-pick --n-per-gender each
       [--speakers C0002,C0004]                             # or choose explicitly
 """
 import argparse
@@ -56,7 +56,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", required=True, help="AISHELL-1 dir (data/C*.zip + docs/spkrinfo.txt)")
-    ap.add_argument("--out", required=True, help="prompt output dir (e.g. AccentVector/prompts/mandarin)")
+    ap.add_argument("--out", required=True, help="prompt output dir (e.g. AccentVector/data/prompts/mandarin)")
     ap.add_argument("--speakers", default="", help="comma-sep zip-stem ids to use (else auto-pick)")
     ap.add_argument("--n-per-gender", type=int, default=2)
     ap.add_argument("--min-dur", type=float, default=6.0)

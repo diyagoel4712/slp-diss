@@ -1,7 +1,7 @@
 #!/bin/bash
 # Submit ALL accent inference sweeps to Eddie as ONE SGE ARRAY job (multi-GPU).
 #
-# Tasks = accents {hindi bengali dutch} x REF_KINDS {l1 native} x SPEAKERS {m f}
+# Tasks = accents {hindi bengali dutch} x REF_KINDS {l1 GAE} x SPEAKERS {m f}
 #         x transcript-SHARDS  -> N array tasks, each an independent 1-GPU job,
 #         packed onto free GPUs by SGE (capped by qsub -tc = MAX_CONCURRENT).
 #   l1     clone the accent's native-LANGUAGE clip (paper-faithful baseline)
@@ -18,7 +18,7 @@
 #   bash scripts/submit_infer_sweeps.sh
 #   DRY_RUN=1 bash scripts/submit_infer_sweeps.sh            # build+print manifest & qsub line, submit nothing
 #   SHARDS=4 MAX_CONCURRENT=12 bash scripts/...              # 4-way transcript split, up to 12 GPUs at once
-#   ACCENTS="dutch" REF_KINDS="native" SPEAKERS="f" bash ... # a subset
+#   ACCENTS="dutch" REF_KINDS="GAE" SPEAKERS="f" bash ... # a subset
 #   HINDI_RUN_DIR=... BENGALI_RUN_DIR=... bash scripts/...   # point at your finetune run dirs
 #
 # A local pre-flight OMITS (doesn't enqueue) any combo whose assets are missing.
@@ -35,7 +35,7 @@ BENGALI_RUN_DIR=${BENGALI_RUN_DIR:-$SCRATCH/F5TTS_v1_LoRA_bengali/RUN_TIMESTAMP}
 DUTCH_RUN_DIR=${DUTCH_RUN_DIR:-$SCRATCH/F5TTS_v1_LoRA_dutch/2026-07-24_00-34-07}
 
 ACCENTS=${ACCENTS:-"hindi bengali dutch"}
-REF_KINDS=${REF_KINDS:-"l1 native"}
+REF_KINDS=${REF_KINDS:-"l1 GAE"}
 SPEAKERS=${SPEAKERS:-"m f"}                     # one set of tasks per speaker
 ALPHAS=${ALPHAS:-"0 0.25 0.5 0.75 1.0"}         # space-sep; passed via -v, wrapper -> commas
 SHARDS=${SHARDS:-1}                             # transcript shards per combo (>1 fans a combo across GPUs)
@@ -67,7 +67,7 @@ emit() {  # accent kind speaker
   chk "$run_dir/vocab.txt"   || miss=1
   chk "vectors/$accent.pt"   || miss=1
   if [ "$kind" = l1 ]; then
-    ref_audio="prompts/$accent/${accent}_${spk}.wav"; ref_text="prompts/$accent/${accent}_${spk}_ref.txt"
+    ref_audio="data/prompts/$accent/${accent}_${spk}.wav"; ref_text="data/prompts/$accent/${accent}_${spk}_ref.txt"
   else
     ref_audio="${NATIVE_PREFIX}_${spk}.wav"; ref_text="${NATIVE_PREFIX}_${spk}.txt"
   fi

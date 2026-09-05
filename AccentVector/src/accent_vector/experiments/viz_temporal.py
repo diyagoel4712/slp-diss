@@ -13,7 +13,7 @@ is learnable from little optimisation and alpha supplies the remaining intensity
 
     python -m accent_vector.experiments.viz_temporal \
         --ckpt-dir exps/F5TTS_v1_LoRA_british/<run>/ckpts/snapshots \
-        --out results/british/temporal.mp4
+        --out results/per-accent/british/temporal.mp4
 """
 
 import argparse

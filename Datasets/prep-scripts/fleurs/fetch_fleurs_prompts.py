@@ -17,7 +17,7 @@ FLEURS gender is a ClassLabel: 0=male, 1=female. Some configs are single-gender 
 per-gender count so you can switch splits if one comes up short.
 
   python fetch_fleurs_prompts.py --config cmn_hans_cn --prefix mandarin \
-      --out ../../AccentVector/prompts/mandarin
+      --out ../../AccentVector/data/prompts/mandarin
 """
 import argparse
 import os
@@ -34,7 +34,7 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", required=True, help="FLEURS config, e.g. cmn_hans_cn / hi_in / ar_eg")
     ap.add_argument("--prefix", required=True, help="output name prefix, e.g. mandarin")
-    ap.add_argument("--out", required=True, help="prompt output dir (e.g. AccentVector/prompts/mandarin)")
+    ap.add_argument("--out", required=True, help="prompt output dir (e.g. AccentVector/data/prompts/mandarin)")
     ap.add_argument("--split", default="train", help="FLEURS split (train usually has both genders)")
     ap.add_argument("--n-per-gender", type=int, default=2)
     ap.add_argument("--min-samples", type=int, default=96000, help="min length in samples (6 s @16k)")

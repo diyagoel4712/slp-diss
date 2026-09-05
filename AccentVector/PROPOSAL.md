@@ -55,7 +55,7 @@ reference text, generation text), with a `char`/`pinyin` tokenizer. Consequences
    reference.** This is not the method working — it is the reference supplying the accent. It
    makes the reference kind the load-bearing variable, so we sweep α under **two reference
    conditions** (`scripts/eddie_infer_sweep.sh REF_KIND`, sibling output trees
-   `results/<accent>/{l1,native}/`):
+   `results/per-accent/<accent>/{l1,GAE}/`):
 
    - **L1 reference** (paper-faithful): a native-language clip of the target accent (e.g.
      Hindi speech for the Indian accent), fixed within the sweep. **α=0 = θ_pre** (pretrained,
@@ -113,7 +113,7 @@ reference text, generation text), with a `char`/`pinyin` tokenizer. Consequences
   work) or only under the L1 reference (accent was cloning)? A flat/leaky neutral-reference
   curve is a valid *negative* transfer result — the sharpest statement that on flow-matching
   F5 the vector is largely redundant to cloning. The seed signal is already visible in a
-  British smoke test (`results/british/`, n=4): accent-ID, WER and UTMOS all *degrade* as α→1.
+  British smoke test (`results/per-accent/british/`, n=4): accent-ID, WER and UTMOS all *degrade* as α→1.
 
   *Language leakage (the language-ID anchor).* Because F5 has no language-ID token to hold
   content in English, does content drift toward the target *language* (not just accent)

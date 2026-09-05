@@ -17,7 +17,7 @@
 # go under CKPT_ROOT, which is REQUIRED (no default) so its location is always an
 # explicit choice: AccentVector/exps locally, or scratch on the HPC
 # (CKPT_ROOT=/exports/eddie/scratch/$USER/accentvector-exps -- the eddie wrapper
-# sets this for you). Everything persistent (results/, vectors/, transcripts/,
+# sets this for you). Everything persistent (results/, vectors/, data/,
 # data/, code) is untouched by this and stays under AccentVector/ as always.
 set -euo pipefail
 

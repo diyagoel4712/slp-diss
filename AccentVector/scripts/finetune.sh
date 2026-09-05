@@ -24,7 +24,7 @@ VCTK_ROOT=${VCTK_ROOT:-/data/VCTK-Corpus-0.92}
 PRETRAIN=${PRETRAIN:-"$F5_ROOT/ckpts/F5TTS_v1_Base/model_1250000.pt"}
 
 DATA_DIR="$F5_ROOT/data/${ACCENT_NAME}_pinyin"   # finetune_cli expects <name>_pinyin
-META_CSV="$ACCENT_DIR/data/${ACCENT_NAME}/metadata.csv"
+META_CSV="$ACCENT_DIR/data/finetuning_data/${ACCENT_NAME}/metadata.csv"
 
 # 1. VCTK -> metadata.csv (England speakers, dur >= 3 s)
 python -m accent_vector.data_preprocess build-vctk \

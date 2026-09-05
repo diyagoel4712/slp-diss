@@ -7,7 +7,7 @@ by clean_translit(). Reusing GP (not FLEURS) means ZERO romanisation mismatch, u
 generic romaniser (uroman) whose Arabic convention won't match GlobalPhone's.
 
 For each chosen speaker it picks one clip in [--min-dur, --max-dur] (nearest --target) and
-writes, into --out (e.g. AccentVector/prompts/arabic):
+writes, into --out (e.g. AccentVector/data/prompts/arabic):
     ar_<M|F>_<spk>.wav        mono 16 kHz
     ar_<M|F>_<spk>_ref.txt    clean_translit transcript (matches the audio + training)
 
@@ -18,7 +18,7 @@ truly held out if you also EXCLUDE it from the training metadata and retrain:
 AccentVector/scripts/submit_indic_ckpt_grid.sh to the ar_<M|F>_<spk> basenames.
 
   python extract_gp_prompts.py --root <gp_arabic> \
-      --out ../../../AccentVector/prompts/arabic \
+      --out ../../../AccentVector/data/prompts/arabic \
       --speakers AR001,AR042            # or omit to auto-pick --n-per-gender per gender
 """
 import argparse
@@ -59,7 +59,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", required=True, help="globalphone_arabic dir (has adc/ trl/ spk/)")
-    ap.add_argument("--out", required=True, help="prompt output dir (e.g. AccentVector/prompts/arabic)")
+    ap.add_argument("--out", required=True, help="prompt output dir (e.g. AccentVector/data/prompts/arabic)")
     ap.add_argument("--shorten", default=os.path.expanduser("~/.local/bin/shorten"))
     ap.add_argument("--tier", default="trl", choices=("trl", "rmn"))
     ap.add_argument("--speakers", default="", help="comma-sep AR ids to use (else auto-pick)")

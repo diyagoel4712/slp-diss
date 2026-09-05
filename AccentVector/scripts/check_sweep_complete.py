@@ -11,10 +11,10 @@ Expected count per alpha dir:
 Checks both the COUNT and the exact index set 0..expected-1, so a shard that dropped utt0003
 is reported as missing [3] even if some other file inflates the count.
 
-    python scripts/check_sweep_complete.py --root results/dutch
-    python scripts/check_sweep_complete.py --root results/british --expected 20
+    python scripts/check_sweep_complete.py --root results/per-accent/dutch
+    python scripts/check_sweep_complete.py --root results/per-accent/british --expected 20
 Exit code is nonzero if any alpha dir is incomplete, so it can gate an eval script:
-    python scripts/check_sweep_complete.py --root results/dutch && bash run_eval.sh
+    python scripts/check_sweep_complete.py --root results/per-accent/dutch && bash run_eval.sh
 """
 
 import argparse
@@ -58,7 +58,7 @@ def expected_for(alpha_dir, counts, override):
 def main():
     ap = argparse.ArgumentParser(description="Flag incomplete alpha_<a>/ synthesis dirs")
     ap.add_argument("--root", required=True, help="results tree to scan (recurses for alpha_<a>/ dirs)")
-    ap.add_argument("--transcripts-dir", default="transcripts/dutch",
+    ap.add_argument("--transcripts-dir", default="data/transcripts/dutch",
                     help="dir of <accent>_<spk>_eval.txt for per-speaker expected counts")
     ap.add_argument("--expected", type=int, help="expected utt count for EVERY dir (skips inference)")
     a = ap.parse_args()

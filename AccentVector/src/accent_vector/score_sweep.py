@@ -33,9 +33,9 @@ speechbrain/lang-id-voxlingua107-ecapa in its isolated env) it is used; otherwis
 the eng_lid column is nan and only the WER-based onset is reported.
 
     python -m accent_vector.score_sweep \
-        --sweep-dir results/british --transcripts transcripts/eval_transcripts.txt \
+        --sweep-dir results/per-accent/british --transcripts data/transcripts/eval_transcripts.txt \
         --ref-wav refs/england.wav --accent-ref /data/vctk_england_clips \
-        --lid --out-csv results/british/rq1.csv
+        --lid --out-csv results/per-accent/british/rq1.csv
 """
 
 import argparse

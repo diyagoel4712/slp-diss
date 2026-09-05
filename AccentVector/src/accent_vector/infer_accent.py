@@ -43,8 +43,8 @@ Modes
         --config exps/.../config.yaml --vocab exps/.../vocab.txt \
         --alphas 0,0.2,0.4,0.6,0.8,1.0 \
         --ref-audio refs/england.wav --ref-text "..." \
-        --transcripts transcripts/eval_transcripts.txt \
-        --out-dir results/british \
+        --transcripts data/transcripts/eval_transcripts.txt \
+        --out-dir results/per-accent/british \
         [--lora-label british --lora-mapping exps/.../lora_mapping.json]
 
     # full-fine-tune alpha sweep over a merged checkpoint diff (Eq. 4)
@@ -53,15 +53,15 @@ Modes
         --vector vectors/british.pt \
         --alphas 0,0.2,0.4,0.6,0.8,1.0 \
         --ref-audio refs/england.wav --ref-text "..." \
-        --transcripts transcripts/eval_transcripts.txt \
-        --out-dir results/british
+        --transcripts data/transcripts/eval_transcripts.txt \
+        --out-dir results/per-accent/british
 
     # synthesize a single, already-composed checkpoint (e.g. a mixed accent)
     python -m accent_vector.infer_accent \
         --ckpt ckpts/mixed/spanish+british.pt \
         --ref-audio refs/england.wav --ref-text "..." \
-        --transcripts transcripts/eval_transcripts.txt \
-        --out-dir results/spanish+british
+        --transcripts data/transcripts/eval_transcripts.txt \
+        --out-dir results/per-accent/spanish+british
 """
 
 import argparse

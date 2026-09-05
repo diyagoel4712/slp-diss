@@ -8,7 +8,7 @@ magnitude. Groups that carry a large share are candidates to scale on their own
 suprasegmental effect -- the ablation that localises where prosody lives.
 
     python -m accent_vector.experiments.rq3_layers \
-        --vector vectors/british.pt --out-csv results/british/rq3_layers.csv
+        --vector vectors/british.pt --out-csv results/per-accent/british/rq3_layers.csv
 """
 
 import argparse

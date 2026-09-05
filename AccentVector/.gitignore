@@ -1,14 +1,22 @@
 # generated artifacts
-data/
 exps/
 vectors/
 results/
 wandb/
 runs/
 logs/
-prompts/
-ground_truth_refs/
 refs/
 *.pt
 __pycache__/
 *.pyc
+
+# data/ holds both inputs and bulk. Ignore everything under it...
+data/*
+# ...except the eval assets, which are INPUTS, not generated: they define the
+# evaluation set and were tracked before being moved in here. Without these
+# negations the `data/*` rule silently drops them out of version control (the
+# parent must be excluded with `data/*`, not `data/`, for a negation to work).
+!data/transcripts/
+!data/prompts/
+!data/ground_truth_refs/
+# still ignored by the rule above: data/finetuning_data/ (per-accent corpora)

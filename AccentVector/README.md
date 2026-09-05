@@ -49,7 +49,7 @@ set up in `Preliminary_test_results/f5-tts`). Two consequences:
      checkpoint and `compose` merges `theta_pre + alpha*tau` for the alpha sweep.
      Use it when you want a full-weight vector rather than a LoRA branch.
 
-   > Both tracks emit the identical `results/<accent>/alpha_<a>/utt####.wav`
+   > Both tracks emit the identical `results/per-accent/<accent>/alpha_<a>/utt####.wav`
    > layout, so `evaluate` and every `rq*` analysis read them the same way. Note a
    > LoRA snapshot cannot go through `extract`/`compose` (its delta lives in new
    > adapter keys absent from the base, so the diff is empty) — scale it natively
@@ -123,8 +123,8 @@ monotonically with alpha while speaker similarity stays high (≈0.9 in the pape
 python main.py vector extract  --pretrained .../model_1250000.pt --finetuned .../model_60000.pt --out vectors/british.pt
 python main.py vector compose  --pretrained .../model_1250000.pt --vector vectors/british.pt --alpha 0.6 --out ckpts/british/a0.6.pt
 python main.py infer    --pretrained .../model_1250000.pt --vector vectors/british.pt --alphas 0,0.2,0.4,0.6,0.8,1.0 \
-                        --ref-audio refs/england.wav --ref-text "..." --transcripts transcripts/eval_transcripts.txt --out-dir results/british
-python main.py evaluate --sweep-dir results/british --transcripts transcripts/eval_transcripts.txt --ref-wav refs/england.wav --out-csv results/british/metrics.csv
+                        --ref-audio refs/england.wav --ref-text "..." --transcripts data/transcripts/eval_transcripts.txt --out-dir results/per-accent/british
+python main.py evaluate --sweep-dir results/per-accent/british --transcripts data/transcripts/eval_transcripts.txt --ref-wav refs/england.wav --out-csv results/per-accent/british/metrics.csv
 ```
 
 ## Mixed accents (paper Eq. 5-6)
@@ -138,7 +138,7 @@ python main.py vector compose --pretrained .../model_1250000.pt \
     --out ckpts/mixed/spanish+british.pt
 python main.py infer --ckpt ckpts/mixed/spanish+british.pt \
     --ref-audio refs/england.wav --ref-text "..." \
-    --transcripts transcripts/eval_transcripts.txt --out-dir results/spanish+british
+    --transcripts data/transcripts/eval_transcripts.txt --out-dir results/per-accent/spanish+british
 ```
 
 ## Data & later phases
@@ -153,7 +153,7 @@ python main.py infer --ckpt ckpts/mixed/spanish+british.pt \
   data works but must be segmented into clean L1 vs English spans. Keep test speakers
   **disjoint** from the fine-tuning set.
 - **Several speakers per accent:** give the accent's `references` block one entry per speaker
-  (see `grid.py`); the grid sweeps each into `results/<accent>/<speaker>/`. Score each speaker
+  (see `grid.py`); the grid sweeps each into `results/per-accent/<accent>/<speaker>/`. Score each speaker
   with the `rq*` modules, then pool across speakers with `experiments.aggregate` (per-α mean ±
   spread) for a consistency check.
 - **Non-Latin transcripts:** the F5 base vocab covers Latin + pinyin only, so Hindi/Arabic/
@@ -180,8 +180,11 @@ src/accent_vector/       the importable package -- src layout, so PYTHONPATH=src
 scripts/                 finetune / extract / infer / evaluate wrappers and the
                          Eddie array jobs (these export PYTHONPATH=$ACCENT_DIR/src)
 notebooks/               dissertation_figures.ipynb -- every figure, by RQ
-transcripts/             held-out English eval transcripts
-prompts/, ground_truth_refs/   per-accent reference clips and natural targets
+data/                    all inputs (git-ignored; see .gitignore)
+  finetuning_data/       per-accent fine-tuning metadata.csv
+  transcripts/           held-out English eval transcripts
+  prompts/               per-accent L1 reference clips + GAE/ neutral controls
+  ground_truth_refs/     natural target-accent clips (accent CS + RQ3 targets)
 main.py                  dispatcher (data/vector/infer/evaluate/score-sweep/
                          score-prosody); adds src/ to sys.path itself
 ```

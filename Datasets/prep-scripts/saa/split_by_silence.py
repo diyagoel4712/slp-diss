@@ -6,8 +6,8 @@ EAR and tune --noise / --min-sil if boundaries are off.
 
 Needs ffmpeg + ffprobe on PATH (conda install -c conda-forge ffmpeg).
 
-  python split_by_silence.py --in ground_truth_refs/arabic/male/arabic_m.wav \
-      --out-dir ground_truth_refs/arabic/male --prefix arabic_m --n 5
+  python split_by_silence.py --in data/ground_truth_refs/arabic/male/arabic_m.wav \
+      --out-dir data/ground_truth_refs/arabic/male --prefix arabic_m --n 5
 """
 import argparse
 import re

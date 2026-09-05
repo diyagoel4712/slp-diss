@@ -34,13 +34,13 @@ this script itself runs in) -- same bridge pattern as ``Evaluation/run_eval.py``
 Usage
 -----
     python -m accent_vector.evaluate \
-        --sweep-dir results/british \
-        --transcripts transcripts/eval_transcripts.txt \
+        --sweep-dir results/per-accent/british \
+        --transcripts data/transcripts/eval_transcripts.txt \
         --ref-wav refs/england.wav \
         --accent-ref /data/vctk_england_clips \
         --natural-ref /data/bilingual_natural_english_clips \
         --target-accent English \
-        --out-csv results/british/metrics.csv
+        --out-csv results/per-accent/british/metrics.csv
 """
 
 import argparse

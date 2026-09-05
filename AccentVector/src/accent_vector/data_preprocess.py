@@ -28,11 +28,11 @@ Usage
     python -m accent_vector.data_preprocess build-vctk \
         --vctk-root /data/VCTK-Corpus-0.92 \
         --accent English \
-        --out-csv data/british/metadata.csv
+        --out-csv data/finetuning_data/british/metadata.csv
 
     python -m accent_vector.data_preprocess prepare \
         --audio-root /data/VCTK-Corpus-0.92 \
-        --metadata   data/british/metadata.csv \
+        --metadata   data/finetuning_data/british/metadata.csv \
         --out-dir    data/british_pinyin
 """
 

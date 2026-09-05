@@ -67,7 +67,7 @@ export ALPHAS="${ALPHAS// /,}"
 # conditions land in sibling trees results/<accent>/<ref_kind>/ for a clean comparison.
 export REF_KIND=${REF_KIND:-l1}
 case "$REF_KIND" in
-    native)
+    GAE|native)
         # per-speaker default when SPEAKER is set (native_ga_f.wav), else the shared clip.
         export REF_AUDIO=${REF_AUDIO:-"$ACCENT_DIR/refs/native_ga${SPEAKER:+_$SPEAKER}.wav"}
         export REF_TEXT=${REF_TEXT:-"$ACCENT_DIR/refs/native_ga${SPEAKER:+_$SPEAKER}.txt"}
@@ -78,7 +78,7 @@ case "$REF_KIND" in
         export REF_TEXT=${REF_TEXT:?set REF_TEXT to the exact transcript of REF_AUDIO (or a path to a file holding it)}
         ;;
     *)
-        echo "ERROR: REF_KIND must be 'l1' or 'native' (got '$REF_KIND')" >&2; exit 1
+        echo "ERROR: REF_KIND must be 'l1' or 'GAE' (got '$REF_KIND')" >&2; exit 1
         ;;
 esac
 # REF_TEXT may be either the literal transcript or a path to a file containing it
@@ -92,7 +92,7 @@ fi
 export REF_TEXT
 # nest per-speaker (results/<accent>/<ref_kind>/<speaker>/audio/) when SPEAKER is set.
 # audio/ mirrors the array/eval split so CSVs can live in a sibling metrics/ tree.
-export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}/${REF_KIND}${SPEAKER:+/$SPEAKER}/audio"}
+export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/per-accent/${ACCENT_NAME}/${REF_KIND}${SPEAKER:+/$SPEAKER}/audio"}
 # LoRA is the paper-matching default in infer_sweep.sh; set LORA=0 for a merged sweep.
 export LORA=${LORA:-1}
 

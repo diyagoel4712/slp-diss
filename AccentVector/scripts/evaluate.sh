@@ -13,8 +13,8 @@ export KMP_DUPLICATE_LIB_OK=TRUE   # avoid the libomp double-init crash on macOS
 EVAL_PYTHON=${EVAL_PYTHON:-"$ACCENT_DIR/../.conda/bin/python"}
 
 ACCENT_NAME=${ACCENT_NAME:-british}
-SWEEP_DIR=${SWEEP_DIR:-"$ACCENT_DIR/results/${ACCENT_NAME}"}
-TRANSCRIPTS=${TRANSCRIPTS:-"$ACCENT_DIR/transcripts/eval_transcripts.txt"}
+SWEEP_DIR=${SWEEP_DIR:-"$ACCENT_DIR/results/per-accent/${ACCENT_NAME}"}
+TRANSCRIPTS=${TRANSCRIPTS:-"$ACCENT_DIR/data/transcripts/eval_transcripts.txt"}
 REF_WAV=${REF_WAV:-"$ACCENT_DIR/refs/england.wav"}   # native-language (L1) reference
 ACCENT_REF=${ACCENT_REF:-}          # dir of real target-accent clips (for cs_accent)
 NATURAL_REF=${NATURAL_REF:-}        # dir of natural same-utterance recordings (for f0_rmse/mcd/ppg_kl)

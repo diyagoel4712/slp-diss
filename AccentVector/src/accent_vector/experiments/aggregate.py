@@ -14,13 +14,13 @@ spread = the vector behaves consistently across speakers). It is metric-agnostic
 per-speaker CSVs sharing an ``alpha`` column work (rq1, rq3, ...).
 
     # score each speaker (per-speaker refs), then pool:
-    for s in results/indian/*/; do sp=$(basename "$s")
+    for s in results/per-accent/indian/*/; do sp=$(basename "$s")
       python -m accent_vector.score_sweep --sweep-dir "$s" \
-        --transcripts transcripts/eval_transcripts.txt --ref-wav refs/indian/$sp.wav \
+        --transcripts data/transcripts/eval_transcripts.txt --ref-wav refs/indian/$sp.wav \
         --accent-ref natural/indian/$sp --lid --out-csv "$s/rq1.csv"
     done
     python -m accent_vector.experiments.aggregate \
-        --accent-dir results/indian --csv-name rq1.csv --out-dir results/indian
+        --accent-dir results/per-accent/indian --csv-name rq1.csv --out-dir results/per-accent/indian
 """
 
 import argparse

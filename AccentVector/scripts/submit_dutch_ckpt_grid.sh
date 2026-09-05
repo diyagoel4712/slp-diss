@@ -4,13 +4,13 @@
 # Grid = checkpoints every STEP_INTERVAL steps (default 5k; up to LAST_STEP=73400), snapped to
 #        nearest snapshot so runs of different length align -- STEP_INTERVAL=0 falls back to
 #        N_CHECKPOINTS evenly-spaced per-run fractions
-#        x REF_KINDS {l1 native} x SPEAKERS {m f} x transcript-SHARDS,
+#        x REF_KINDS {l1 GAE} x SPEAKERS {m f} x transcript-SHARDS,
 # each an alpha sweep {0 0.25 0.5 0.75 1.0} ->
-#   results/dutch/<ref_kind>/<speaker>/step_<step>/alpha_<a>/utt####.wav
+#   results/per-accent/dutch/<ref_kind>/<speaker>/step_<step>/alpha_<a>/utt####.wav
 # so rq1_reproduction (per step) + rq2_behavioural compare matched-alpha across training.
 #
-# Dutch assets (all local in the repo): L1 = prompts/dutch/dutch_{m,f}.{wav,_ref.txt};
-# GAE = prompts/GAE/gae_{m,f}.{wav,txt}; per-speaker sentences = transcripts/dutch/dutch_{m,f}_eval.txt.
+# Dutch assets (all local in the repo): L1 = data/prompts/dutch/dutch_{m,f}.{wav,_ref.txt};
+# GAE = data/prompts/GAE/gae_{m,f}.{wav,txt}; per-speaker sentences = data/transcripts/dutch/dutch_{m,f}_eval.txt.
 # Checkpoints are discovered in RUN_DIR/ckpts (prefers lora_<step>.pt snapshots, else
 # model_<step>.pt which the array task slices on the fly).
 #
@@ -32,12 +32,12 @@ STEP_INTERVAL=${STEP_INTERVAL:-5000}  # pick checkpoints on a FIXED step grid (5
                                       # different length align on the same x-axis for overlay plots.
                                       # 0 = fall back to N_CHECKPOINTS evenly-spaced per-run fractions.
 N_CHECKPOINTS=${N_CHECKPOINTS:-8}  # only used when STEP_INTERVAL=0
-REF_KINDS=${REF_KINDS:-"l1 native"}
+REF_KINDS=${REF_KINDS:-"l1 GAE"}
 SPEAKERS=${SPEAKERS:-"m f"}
 ALPHAS=${ALPHAS:-"0 0.25 0.5 0.75 1.0"}     # space-sep; passed via -v, wrapper -> commas
 SHARDS=${SHARDS:-1}
 MAX_CONCURRENT=${MAX_CONCURRENT:-8}
-NATIVE_PREFIX=${NATIVE_PREFIX:-prompts/GAE/gae}
+NATIVE_PREFIX=${NATIVE_PREFIX:-data/prompts/GAE/gae}
 # Optional label separating this sweep -> results/<accent>/<tag>/<ref_kind>/... so cells
 # whose step_<step> dirs would otherwise clash (e.g. a hparam grid: RESULTS_TAG=lr3e5_r16)
 # stay distinct. Must be space/comma-free (rides qsub -v). Empty = old flat layout.
@@ -91,11 +91,11 @@ for step in $SELECTED; do
     name="$kind/$spk/step_$step"
     local_miss=0
     if [ "$kind" = l1 ]; then
-      ra="prompts/dutch/dutch_${spk}.wav"; rt="prompts/dutch/dutch_${spk}_ref.txt"
+      ra="data/prompts/dutch/dutch_${spk}.wav"; rt="data/prompts/dutch/dutch_${spk}_ref.txt"
     else
       ra="${NATIVE_PREFIX}_${spk}.wav"; rt="${NATIVE_PREFIX}_${spk}.txt"
     fi
-    tx="transcripts/dutch/dutch_${spk}_eval.txt"
+    tx="data/transcripts/dutch/dutch_${spk}_eval.txt"
     chk "$ra" || local_miss=1
     chk "$rt" || local_miss=1
     chk "$tx" || local_miss=1

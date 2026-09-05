@@ -10,15 +10,15 @@ mis-transcribe accented English. aeneas synthesises the text (espeak) and DTW-al
 Requires aeneas + espeak-ng + ffmpeg (ffmpeg also does the cutting, so no python audio
 deps):  pip install numpy && pip install aeneas
 
-The eval reads GT from ground_truth_refs/<accent>/<male|female>/ (a per-gender POOL, cycled
+The eval reads GT from data/ground_truth_refs/<accent>/<male|female>/ (a per-gender POOL, cycled
 + DTW-aligned in rq3), so pooling several speakers' sentence clips there is fine; they just
 need to be utterance-sized, not one long paragraph.
 
   # run once per gender (inputs live one level up from the eval path):
-  python split_stella.py --in ground_truth_refs/male/arabic_m.wav \
-      --out-dir ground_truth_refs/arabic/male   --prefix arabic_m
-  python split_stella.py --in ground_truth_refs/female/arabic_f.wav \
-      --out-dir ground_truth_refs/arabic/female --prefix arabic_f
+  python split_stella.py --in data/ground_truth_refs/male/arabic_m.wav \
+      --out-dir data/ground_truth_refs/arabic/male   --prefix arabic_m
+  python split_stella.py --in data/ground_truth_refs/female/arabic_f.wav \
+      --out-dir data/ground_truth_refs/arabic/female --prefix arabic_f
 """
 import argparse
 import json
@@ -58,7 +58,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--in", dest="in_wav", required=True, help="one SAA Stella recording")
-    ap.add_argument("--out-dir", required=True, help="ground_truth_refs/<accent>/<male|female>")
+    ap.add_argument("--out-dir", required=True, help="data/ground_truth_refs/<accent>/<male|female>")
     ap.add_argument("--prefix", required=True, help="clip name prefix, e.g. arabic_m")
     ap.add_argument("--sentences", default=str(DEFAULT_SENTENCES),
                     help="one utterance per line (default: shared Stella 5-line split)")

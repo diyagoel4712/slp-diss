@@ -23,7 +23,7 @@ five languages is ~470 pages: at the default 1.0 s delay that is roughly 8-10 mi
     # commit to a selection and pull the mp3s into the eval's layout
     python saa_select.py --languages dutch mandarin hindi arabic bengali \
         --per-gender 20 --max-residence 5 --download-audio \
-        --audio-root ../../../AccentVector/ground_truth_refs
+        --audio-root ../../../AccentVector/data/ground_truth_refs
 """
 import argparse
 import csv

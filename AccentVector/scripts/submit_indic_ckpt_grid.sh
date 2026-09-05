@@ -5,16 +5,16 @@
 # Grid = checkpoints every STEP_INTERVAL steps (default 5k; up to LAST_STEP, 0=auto=max avail),
 #        snapped to nearest snapshot so runs of different length align -- STEP_INTERVAL=0 falls
 #        back to N_CHECKPOINTS evenly-spaced per-run fractions
-#        x REF_KINDS {l1 native} x SPEAKERS {m f} x transcript-SHARDS,
+#        x REF_KINDS {l1 GAE} x SPEAKERS {m f} x transcript-SHARDS,
 # each an alpha sweep {0 0.25 0.5 0.75 1.0} ->
 #   results/<accent>/<ref_kind>/<speaker>/step_<step>/alpha_<a>/utt####.wav
 #
 # L1 refs = the held-out FLEURS prompts, ref text ROMANISED (indic-translit/HK, matching
 # training) in *_ref.txt:
-#   hindi:   m=prompts/hindi/hi_M_04     f=prompts/hindi/hi_F_02
-#   bengali: m=prompts/bengali/bn_M_01   f=prompts/bengali/bn_F_02
-# native (decoupling control) = prompts/GAE/gae_{m,f} (English). Eval transcripts = Stella
-#   (transcripts/<accent>/<accent>_{m,f}_eval.txt), matching the SAA ground truth.
+#   hindi:   m=data/prompts/hindi/hi_M_04     f=data/prompts/hindi/hi_F_02
+#   bengali: m=data/prompts/bengali/bn_M_01   f=data/prompts/bengali/bn_F_02
+# native (decoupling control) = data/prompts/GAE/gae_{m,f} (English). Eval transcripts = Stella
+#   (data/transcripts/<accent>/<accent>_{m,f}_eval.txt), matching the SAA ground truth.
 #
 # Point RUN_DIR at the accent's training run dir (has config.yaml, vocab.txt, ckpts/snapshots):
 #   ACCENT=hindi   RUN_DIR=/exports/.../F5TTS_v1_LoRA_hindi/<ts>   bash scripts/submit_indic_ckpt_grid.sh
@@ -34,16 +34,16 @@ case "$ACCENT" in hindi|bengali|arabic|mandarin) ;; *) echo "ACCENT must be hind
 # array, so it runs on old bash too). Empty output => unknown; caller treats as missing.
 l1base() {
   case "$ACCENT/$1" in
-    hindi/m)   echo prompts/hindi/hi_M_04;;
-    hindi/f)   echo prompts/hindi/hi_F_02;;
-    bengali/m) echo prompts/bengali/bn_M_01;;
-    bengali/f) echo prompts/bengali/bn_F_02;;
+    hindi/m)   echo data/prompts/hindi/hi_M_04;;
+    hindi/f)   echo data/prompts/hindi/hi_F_02;;
+    bengali/m) echo data/prompts/bengali/bn_M_01;;
+    bengali/f) echo data/prompts/bengali/bn_F_02;;
     # Arabic: held-out GlobalPhone speakers (extract_gp_prompts.py); GP romanised ref-text.
-    arabic/m)  echo prompts/arabic/ar_M_AR010;;
-    arabic/f)  echo prompts/arabic/ar_F_AR002;;
+    arabic/m)  echo data/prompts/arabic/ar_M_AR010;;
+    arabic/f)  echo data/prompts/arabic/ar_F_AR002;;
     # Mandarin: held-out FLEURS speakers (Hanzi ref-text; F5 pinyin-converts at infer).
-    mandarin/m) echo prompts/mandarin/mandarin_M_824;;
-    mandarin/f) echo prompts/mandarin/mandarin_F_369;;
+    mandarin/m) echo data/prompts/mandarin/mandarin_M_824;;
+    mandarin/f) echo data/prompts/mandarin/mandarin_F_369;;
   esac
 }
 
@@ -55,12 +55,12 @@ STEP_INTERVAL=${STEP_INTERVAL:-5000}  # pick checkpoints on a FIXED step grid (5
                                       # different length align on the same x-axis for overlay plots.
                                       # 0 = fall back to N_CHECKPOINTS evenly-spaced per-run fractions.
 N_CHECKPOINTS=${N_CHECKPOINTS:-8}  # only used when STEP_INTERVAL=0
-REF_KINDS=${REF_KINDS:-"l1 native"}
+REF_KINDS=${REF_KINDS:-"l1 GAE"}
 SPEAKERS=${SPEAKERS:-"m f"}
 ALPHAS=${ALPHAS:-"0 0.25 0.5 0.75 1.0"}     # space-sep; passed via -v, wrapper -> commas
 SHARDS=${SHARDS:-1}
 MAX_CONCURRENT=${MAX_CONCURRENT:-8}
-NATIVE_PREFIX=${NATIVE_PREFIX:-prompts/GAE/gae}
+NATIVE_PREFIX=${NATIVE_PREFIX:-data/prompts/GAE/gae}
 # Optional label separating this sweep -> results/<accent>/<tag>/<ref_kind>/... so cells
 # whose step_<step> dirs would otherwise clash (e.g. a hparam grid: RESULTS_TAG=lr3e5_r16)
 # stay distinct. Must be space/comma-free (rides qsub -v). Empty = old flat layout.
@@ -121,7 +121,7 @@ for step in $SELECTED; do
     else
       ra="${NATIVE_PREFIX}_${spk}.wav"; rt="${NATIVE_PREFIX}_${spk}.txt"
     fi
-    tx="transcripts/$ACCENT/${ACCENT}_${spk}_eval.txt"
+    tx="data/transcripts/$ACCENT/${ACCENT}_${spk}_eval.txt"
     chk "$ra" || local_miss=1
     chk "$rt" || local_miss=1
     chk "$tx" || local_miss=1

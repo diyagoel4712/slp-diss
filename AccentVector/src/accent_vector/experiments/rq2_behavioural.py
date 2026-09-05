@@ -28,8 +28,8 @@ How to read it for the core question:
     suprasegmental columns across training instead.)
 
     python -m accent_vector.experiments.rq2_behavioural \
-        --by-step-dir results/dutch/native/by_step --csv-name rq1.csv \
-        --out-dir results/dutch/native/trajectory
+        --by-step-dir results/per-accent/dutch/GAE/by_step --csv-name rq1.csv \
+        --out-dir results/per-accent/dutch/GAE/trajectory
 """
 
 import argparse

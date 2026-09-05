@@ -6,13 +6,13 @@
 #
 #   bash scripts/submit_eval_grid.sh                       # full grid, all accents/steps
 #   STEP_SCOPE=final bash scripts/submit_eval_grid.sh      # only the final checkpoint per cell
-#   ACCENTS="dutch" REF_KINDS="native" bash scripts/submit_eval_grid.sh
+#   ACCENTS="dutch" REF_KINDS="GAE" bash scripts/submit_eval_grid.sh
 #   DRY_RUN=1 bash scripts/submit_eval_grid.sh             # print manifest + qsub line, don't submit
 set -uo pipefail
 
 ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
 ACCENTS=${ACCENTS:-"dutch hindi bengali arabic"}
-REF_KINDS=${REF_KINDS:-"l1 native"}
+REF_KINDS=${REF_KINDS:-"l1 GAE"}
 SPEAKERS=${SPEAKERS:-"m f"}
 STEP_SCOPE=${STEP_SCOPE:-all}          # all | final
 MAX_CONCURRENT=${MAX_CONCURRENT:-16}
@@ -22,13 +22,13 @@ RESULTS_TAG=${RESULTS_TAG:-}
 
 # per-accent, per-speaker L1 reference basename (matches submit_indic_ckpt_grid.sh)
 l1base() { case "$1/$2" in
-  dutch/m)   echo prompts/dutch/dutch_m;;   dutch/f)   echo prompts/dutch/dutch_f;;
-  hindi/m)   echo prompts/hindi/hi_M_04;;   hindi/f)   echo prompts/hindi/hi_F_02;;
-  bengali/m) echo prompts/bengali/bn_M_01;; bengali/f) echo prompts/bengali/bn_F_02;;
+  dutch/m)   echo data/prompts/dutch/dutch_m;;   dutch/f)   echo data/prompts/dutch/dutch_f;;
+  hindi/m)   echo data/prompts/hindi/hi_M_04;;   hindi/f)   echo data/prompts/hindi/hi_F_02;;
+  bengali/m) echo data/prompts/bengali/bn_M_01;; bengali/f) echo data/prompts/bengali/bn_F_02;;
   # Arabic: held-out GlobalPhone speakers (must match l1base in submit_indic_ckpt_grid.sh).
-  arabic/m)  echo prompts/arabic/ar_M_AR010;;  arabic/f)  echo prompts/arabic/ar_F_AR002;;
+  arabic/m)  echo data/prompts/arabic/ar_M_AR010;;  arabic/f)  echo data/prompts/arabic/ar_F_AR002;;
   # Mandarin: held-out FLEURS speakers (must match l1base in submit_indic_ckpt_grid.sh).
-  mandarin/m) echo prompts/mandarin/mandarin_M_824;; mandarin/f) echo prompts/mandarin/mandarin_F_369;;
+  mandarin/m) echo data/prompts/mandarin/mandarin_M_824;; mandarin/f) echo data/prompts/mandarin/mandarin_F_369;;
 esac; }
 gdir() { [ "$1" = f ] && echo female || echo male; }   # speaker -> GT gender dir
 
@@ -36,11 +36,11 @@ MANIFEST="logs/eval_tasks.$(date +%Y%m%d_%H%M%S).tsv"; : > "$MANIFEST"
 n=0 n_nogt=0
 for a in $ACCENTS; do for r in $REF_KINDS; do for s in $SPEAKERS; do
   base="$(l1base "$a" "$s")"
-  [ "$r" = l1 ] && ref="$base.wav" || ref="prompts/GAE/gae_${s}.wav"
-  tx="transcripts/$a/${a}_${s}_eval.txt"
-  gt="ground_truth_refs/$a/$(gdir "$s")"; [ -d "$gt" ] || gt=""    # empty => cs_accent/rq3 skipped
+  [ "$r" = l1 ] && ref="$base.wav" || ref="data/prompts/GAE/gae_${s}.wav"
+  tx="data/transcripts/$a/${a}_${s}_eval.txt"
+  gt="data/ground_truth_refs/$a/$(gdir "$s")"; [ -d "$gt" ] || gt=""    # empty => cs_accent/rq3 skipped
 
-  rroot="results/$a${RESULTS_TAG:+/$RESULTS_TAG}/$r/$s/audio"
+  rroot="results/per-accent/$a${RESULTS_TAG:+/$RESULTS_TAG}/$r/$s/audio"
   steps=$(ls -d "$rroot"/step_* 2>/dev/null | sort -t_ -k2 -n)
   [ -n "$steps" ] || { echo "  no sweeps under $rroot"; continue; }
   [ "$STEP_SCOPE" = final ] && steps=$(echo "$steps" | tail -1)

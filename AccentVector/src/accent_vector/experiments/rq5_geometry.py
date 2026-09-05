@@ -10,7 +10,7 @@ classical-MDS embedding of the weight-space matrix gives the accent map.
 
     python -m accent_vector.experiments.rq5_geometry \
         --vector british=vectors/british.pt --vector spanish=vectors/spanish.pt \
-        --synth british=results/british/alpha_1.0 --synth spanish=results/spanish/alpha_1.0 \
+        --synth british=results/per-accent/british/alpha_1.0 --synth spanish=results/per-accent/spanish/alpha_1.0 \
         --out-dir results/geometry
 """
 

@@ -122,15 +122,15 @@ warm_caches() {
   # array job's own logic (so whatever it needs, gets cached), then compute nodes run
   # the same script with HF_HUB_OFFLINE=1. Pick any existing sweep dir.
   local sweep
-  sweep=$(ls -d "$ACCENT_DIR"/results/dutch/native/f/step_* 2>/dev/null | tail -1)
+  sweep=$(ls -d "$ACCENT_DIR"/results/per-accent/dutch/GAE/f/step_* 2>/dev/null | tail -1)
   [ -n "$sweep" ] || { echo "no dutch sweep found to warm on; set it manually" >&2; return 1; }
   echo "== warming model caches on: $sweep =="
   # build a 1-row manifest for that sweep
   local m="$ACCENT_DIR/logs/warm.tsv"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' dutch f native "$sweep" \
-    "$ACCENT_DIR/transcripts/dutch/dutch_f_eval.txt" \
-    "$ACCENT_DIR/prompts/GAE/gae_f.wav" \
-    "$ACCENT_DIR/ground_truth_refs/dutch/female" > "$m"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' dutch f GAE "$sweep" \
+    "$ACCENT_DIR/data/transcripts/dutch/dutch_f_eval.txt" \
+    "$ACCENT_DIR/data/prompts/GAE/gae_f.wav" \
+    "$ACCENT_DIR/data/ground_truth_refs/dutch/female" > "$m"
   SGE_O_WORKDIR="$ACCENT_DIR" SGE_TASK_ID=1 HF_HUB_OFFLINE=0 \
     bash "$ACCENT_DIR/scripts/eddie_eval_array.sh" "$m"
   echo "caches warmed. Compute-node jobs can now run offline."

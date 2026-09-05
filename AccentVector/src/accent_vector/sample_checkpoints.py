@@ -16,7 +16,7 @@ build with infer_accent via accent_vector.lora_model.
         --base-ckpt ckpts/F5TTS_v1_Base/model_1250000.pt \
         --ref-audio ref.wav --ref-text "..." \
         --gen-text "The quick brown fox jumps over the lazy dog." \
-        --out-dir results/british/scrub
+        --out-dir results/per-accent/british/scrub
 """
 
 import argparse

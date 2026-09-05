@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """Convert mp3 (or any ffmpeg-readable audio) to the wav format the ground-truth refs use:
-mono, 16 kHz, 16-bit PCM -- matching the existing ground_truth_refs/*/{male,female}/*.wav.
+mono, 16 kHz, 16-bit PCM -- matching the existing data/ground_truth_refs/*/{male,female}/*.wav.
 ffmpeg-only, so it runs on Eddie (conda install -c conda-forge ffmpeg).
 
 Typical use is the step BEFORE split_by_silence.py: convert the downloaded paragraph
 recording, then cut it into utterances.
 
   # one file, writes alongside as mandarin1.wav
-  python mp3_to_wav.py ground_truth_refs/mandarin/female/mandarin1.mp3
+  python mp3_to_wav.py data/ground_truth_refs/mandarin/female/mandarin1.mp3
 
   # a whole directory (non-recursive unless -r), explicit name, or a different rate
-  python mp3_to_wav.py ground_truth_refs/mandarin -r
-  python mp3_to_wav.py in.mp3 --out ground_truth_refs/mandarin/female/mandarin_f.wav
+  python mp3_to_wav.py data/ground_truth_refs/mandarin -r
+  python mp3_to_wav.py in.mp3 --out data/ground_truth_refs/mandarin/female/mandarin_f.wav
   python mp3_to_wav.py in.mp3 --sr 24000            # F5 prompt rate instead of eval's 16k
 """
 import argparse
