@@ -21,9 +21,10 @@ five languages is ~470 pages: at the default 1.0 s delay that is roughly 8-10 mi
     python saa_select.py --languages dutch mandarin hindi arabic bengali
 
     # commit to a selection and pull the mp3s into the eval's layout
+    # (--audio-root defaults to AccentVector/data/ground_truth_refs, resolved from
+    #  this file, so it lands in the right place from any working directory)
     python saa_select.py --languages dutch mandarin hindi arabic bengali \
-        --per-gender 20 --max-residence 5 --download-audio \
-        --audio-root ../../../AccentVector/data/ground_truth_refs
+        --per-gender 20 --max-residence 5 --download-audio
 """
 import argparse
 import csv
@@ -202,7 +203,12 @@ def main():
     p.add_argument("--rejects-csv", default=None,
                    help="optional: write every scraped speaker with its keep/reject reason")
     p.add_argument("--download-audio", action="store_true")
-    p.add_argument("--audio-root", default="ground_truth_refs",
+    # Resolved from this file, not the cwd: the eval reads GT from exactly this
+    # path, and a bare relative default silently created a stray dir wherever
+    # the script happened to be run from.
+    p.add_argument("--audio-root",
+                   default=str(Path(__file__).resolve().parents[3]
+                               / "AccentVector" / "data" / "ground_truth_refs"),
                    help="mp3s land in <audio-root>/<language>/<male|female>/<sample_id>.mp3")
     args = p.parse_args()
 
@@ -320,8 +326,10 @@ def main():
                 print(f"  ! {rec['sample_id']}: {e}", file=sys.stderr)
         print("[saa] audio done")
         print("\nnext:  python mp3_to_wav.py <audio-root>/<accent> -r"
-              "\n       python split_stella.py --in <wav> --out-dir <accent>/<gender> "
-              "--prefix <sample_id>   # per speaker")
+              "\n       # per speaker: align to the known sentences, then cut at those times"
+              "\n       B=$(conda run -n accentvector-eval python align_stella_ta.py --in <wav>)"
+              "\n       python split_by_silence.py --in <wav> --out-dir <accent>/<gender> "
+              "--prefix <sample_id> --at \"$B\"")
 
 
 if __name__ == "__main__":

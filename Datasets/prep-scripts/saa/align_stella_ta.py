@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Forced-align a Speech Accent Archive "Please call Stella" recording to the known
-sentence list and print the inter-sentence boundary times -- a torchaudio replacement for
-the aeneas step in split_stella.py (aeneas + espeak-ng install cleanly on neither macOS
-nor Eddie; torchaudio's MMS_FA aligner is already in the accentvector-eval env).
+sentence list and print the inter-sentence boundary times.
 
-Same rationale as split_stella.py: the transcript is fixed and known, so aligning known
+Replaces an earlier aeneas-based splitter (removed): aeneas + espeak-ng install cleanly
+on neither macOS nor Eddie, whereas torchaudio's MMS_FA aligner is already in the
+accentvector-eval env.
+
+Rationale: the transcript is fixed and known, so aligning known
 text is robust to the speaker's accent, unlike ASR or silence heuristics (Stella's commas
 produce pauses LONGER than some sentence boundaries, so split_by_silence's "N-1 longest
 pauses" rule misfires on these recordings).

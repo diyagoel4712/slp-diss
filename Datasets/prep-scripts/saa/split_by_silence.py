@@ -4,6 +4,16 @@
 we cut at the midpoints of the N-1 longest interior silences. Not text-aligned, so VERIFY BY
 EAR and tune --noise / --min-sil if boundaries are off.
 
+DO NOT rely on the silence heuristic for Speech Accent Archive "Stella" recordings:
+Stella's commas produce pauses LONGER than some sentence boundaries, so the "N-1 longest
+pauses" rule misfires. For those, get the boundaries by forced alignment first and pass
+them in with --at; this script is then just the cutter:
+
+    B=$(conda run -n accentvector-eval python align_stella_ta.py --in <wav>)
+    python split_by_silence.py --in <wav> --out-dir <dir> --prefix <p> --at "$B"
+
+The bare heuristic is still fine for material with clean sentence-final pauses.
+
 Needs ffmpeg + ffprobe on PATH (conda install -c conda-forge ffmpeg).
 
   python split_by_silence.py --in data/ground_truth_refs/arabic/male/arabic_m.wav \
