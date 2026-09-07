@@ -1,4 +1,4 @@
-"""[E5.1] RQ5 go/no-go -- the accent-vector Gram matrix and what it says.
+"""RQ5 go/no-go -- the accent-vector Gram matrix and what it says.
 
 Everything in the weight-space arm of RQ5 (H5a) is a function of the K x K matrix
 of inner products between accent vectors:
@@ -33,7 +33,7 @@ lambda (``lora_alpha``) is 1 for a vector at full strength -- alpha scaling happ
 at inference via ``set_lora_alpha``, which scales the branch OUTPUT and is correct.
 
     WARNING, verified by test: never scale a raw LoRA snapshot elementwise (i.e.
-    never point ``extract_vector compose --alpha`` at one). Multiplying the state
+    never scale one with ``set_lora_alpha``). Multiplying the state
     dict by ``s`` hits encoders and decoders both, so ``dW = B A`` picks up ``s^2``
     while ``decoders.bias`` picks up only ``s``. That is not a rescaled accent
     vector at all -- the matrix and bias parts move apart, so the result is not a

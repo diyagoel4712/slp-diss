@@ -52,8 +52,9 @@ import sys
 
 # Not part of the upstream fork -- installed fresh (already fixed) if absent.
 CONFIG_DEST = "src/f5_tts/configs/F5TTS_v1_LoRA_accent.yaml"
-# The recipe the dissertation reports (Lertpetchpun et al.): if the installed
-# config ever stops matching these, training would silently contradict the text.
+# The recipe the dissertation reports (Lertpetchpun et al.). Deviating is fine --
+# rank/lr sweeps are real experiments -- but it should never happen unnoticed, so
+# verify_config() warns when the installed config differs from these.
 PINNED_HPARAMS = {"learning_rate": "3e-5", "lora_rank": "16"}
 
 PATCHES = [
@@ -129,14 +130,19 @@ def verify_config(f5_root):
         m = re.search(rf"^\s*{key}\s*:\s*([^\s#]+)", text, re.M)
         return m.group(1) if m else None
 
-    bad = [f"{k}={value(k)!r} (expected {want!r})"
+    bad = [f"{k}={value(k)!r} (recipe: {want!r})"
            for k, want in PINNED_HPARAMS.items() if value(k) != want]
     if bad:
-        print(f"[FAIL] {CONFIG_DEST}: hyperparameters do not match the pinned "
-              f"dissertation recipe -- " + "; ".join(bad))
-        print("       Fix the config in the F5-TTS fork, or update PINNED_HPARAMS "
-              "here if the recipe itself changed.")
-        return "diverged"
+        # A WARNING, not a failure: sweeping rank / lr is legitimate experimental
+        # work. What is not legitimate is doing it by accident, or reporting the
+        # recipe's numbers while training with different ones -- so say so loudly
+        # and carry on.
+        print(f"[WARN] {CONFIG_DEST}: hyperparameters differ from the reported "
+              f"recipe -- " + "; ".join(bad))
+        print("       Fine if you are deliberately sweeping; make sure the write-up "
+              "reports what actually trained (RESULTS_TAG is the usual way to keep "
+              "sweeps apart).")
+        return "already"
     print(f"[OK]   {CONFIG_DEST}: present, hyperparameters match "
           + ", ".join(f"{k}={v}" for k, v in PINNED_HPARAMS.items()))
     return "already"

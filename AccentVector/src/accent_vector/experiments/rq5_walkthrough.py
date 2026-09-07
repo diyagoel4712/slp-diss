@@ -1,4 +1,4 @@
-"""[E5.0] RQ5 walkthrough -- the same objects as ``rq5_gram``, explained as they print.
+"""RQ5 walkthrough -- the same objects as ``rq5_gram``, explained as they print.
 
 ``rq5_gram`` is the experiment; this is the tutorial. It computes nothing new -- it
 imports the same functions -- but narrates each object so the abstractions land on

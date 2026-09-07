@@ -93,8 +93,6 @@ export REF_TEXT
 # nest per-speaker (results/<accent>/<ref_kind>/<speaker>/audio/) when SPEAKER is set.
 # audio/ mirrors the array/eval split so CSVs can live in a sibling metrics/ tree.
 export OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/results/per-accent/${ACCENT_NAME}/${REF_KIND}${SPEAKER:+/$SPEAKER}/audio"}
-# LoRA is the paper-matching default in infer_sweep.sh; set LORA=0 for a merged sweep.
-export LORA=${LORA:-1}
 
 echo "accent=$ACCENT_NAME  speaker=${SPEAKER:-<none>}  vector=$VECTOR"
 echo "config=$CONFIG  vocab=$VOCAB"

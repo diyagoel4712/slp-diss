@@ -1,6 +1,6 @@
 #!/bin/bash
 # Eddie (SGE) CPU ARRAY: score ONE alpha-sweep dir per task with the RQ eval suite --
-# rq1 (accent_cs / speaker_sim / WER / LID) + rq3 (segmental/suprasegmental) + UTMOS.
+# rq1 (accent_cs / speaker_sim / WER / LID) + rq3 (segmental/suprasegmental).
 # No GPU. Models are pre-staged by eddie_eval_setup.sh; jobs run offline.
 # Submit via scripts/submit_eval_grid.sh (builds the manifest and runs qsub -t 1-N ...).
 #
@@ -26,7 +26,6 @@ EVAL_DIR="$REPO/Evaluation"
 # --- envs + offline caches (must match eddie_eval_setup.sh) ---
 EVAL_ENV=${EVAL_ENV:-slp-eval}
 GENAID_ENV=${GENAID_ENV:-genaid}
-UTMOS_ENV=${UTMOS_ENV:-slp-utmos}
 export HF_HOME=${HF_HOME:-/exports/eddie/scratch/$USER/hfcache}
 export HF_HUB_OFFLINE=${HF_HUB_OFFLINE:-1}   # setup's warm pass overrides this to 0
 export KMP_DUPLICATE_LIB_OK=TRUE
@@ -34,7 +33,6 @@ export OMP_NUM_THREADS=${NSLOTS:-4}
 # evaluation_functions.py shells out to the genaid env for cs_accent/speaker_sim/LID:
 export GENAID_DIR="$EVAL_DIR/GenAID/recipes/CommonAccent"
 export GENAID_PYTHON="$(conda run -n "$GENAID_ENV" which python)"
-UTMOS_PYTHON="$(conda run -n "$UTMOS_ENV" which python)"
 
 conda activate "$EVAL_ENV"
 export PYTHONPATH="$ACCENT_DIR/src:$EVAL_DIR:${PYTHONPATH:-}"
@@ -72,7 +70,5 @@ else
   echo "  [rq3] skipped (no GT_DIR for $ACCENT/$SPEAKER)"
 fi
 
-# --- UTMOS (own env, reference-free). ---
-"$UTMOS_PYTHON" "$EVAL_DIR/score_utmos.py" --sweep-dir "$SWEEP_DIR" --out-csv "$METRICS_DIR/utmos.csv"
 
-echo "[eval $JOB_ID.$SGE_TASK_ID] done -> $METRICS_DIR/{rq1,rq3,utmos}.csv"
+echo "[eval $JOB_ID.$SGE_TASK_ID] done -> $METRICS_DIR/{rq1,rq3}.csv"

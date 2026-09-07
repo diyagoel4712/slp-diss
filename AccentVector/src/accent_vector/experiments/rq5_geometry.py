@@ -1,4 +1,4 @@
-"""[E5.1-5.3] RQ5 -- geometry of the accent-vector space.
+"""Geometry of the accent-vector space (RQ5).
 
 Builds two accent-similarity matrices and compares them:
 
@@ -28,13 +28,9 @@ def load_vector_flat(vector_path, include=None, exclude=None):
     tensors, in sorted-key order (stable across accents so vectors are
     comparable). Optional include/exclude substrings restrict to a layer subset.
 
-    Accepts either track's vector: a full-weight diff from ``extract_vector`` or a
-    LoRA snapshot (``lora_<step>.pt`` / a saved ``lora_state_dict``) -- both
-    flatten through ``load_flat_checkpoint``, and a LoRA snapshot's keys keep the
+    Takes a LoRA snapshot (``lora_<step>.pt`` / a saved ``lora_state_dict``), which
+    flattens through ``load_flat_checkpoint``; its keys keep the
     ``blocks.N.attn...`` paths so ``rq3_layers`` groups them the same way.
-
-    NB: full fine-tune vectors are ~300M-D; prefer LoRA vectors here, or pass a
-    layer filter, to keep this in memory.
     """
     from accent_vector.extract_vector import load_flat_checkpoint, _key_selected
 

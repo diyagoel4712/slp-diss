@@ -1,10 +1,10 @@
-"""[E3.4] RQ3 -- layer localisation of the accent vector.
+"""Layer localisation of the accent vector (RQ3).
 
 Where in the network does the accent shift live? Partition the vector's tensors
 into module groups (attention / feed-forward / conv / text-embed, and
 early/late by block index) and report each group's share of the total RMS
 magnitude. Groups that carry a large share are candidates to scale on their own
-(via ``extract_vector compose --include ...``) to test their segmental vs
+(via ``infer_accent --include-layers ...``) to test their segmental vs
 suprasegmental effect -- the ablation that localises where prosody lives.
 
     python -m accent_vector.experiments.rq3_layers \

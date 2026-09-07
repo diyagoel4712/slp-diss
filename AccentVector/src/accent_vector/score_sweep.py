@@ -4,7 +4,7 @@ language leakage.
 Writes ``rq1.csv`` (one row per alpha) -- the file the figures notebook reads for
 RQ1 (Ch.2) and, per checkpoint, for the RQ1b trajectory (Ch.2). Named for what it
 computes rather than for a question number: the numbering has moved twice, the
-metrics have not. Formerly ``experiments/rq1_reproduction.py`` [E1.1-1.5].
+metrics have not. Formerly ``experiments/rq1_reproduction.py``.
 
 Over one accent's alpha sweep, measure whether accent strength rises
 monotonically with alpha while speaker identity is retained, and instrument the

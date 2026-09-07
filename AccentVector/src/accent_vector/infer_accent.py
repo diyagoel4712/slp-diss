@@ -24,80 +24,45 @@ The reference *kind* is itself a deliberately-varied experimental condition comp
 Note on the paper deviation: XTTS pins a language-ID token to keep content
 English while the delta supplies the accent. F5-TTS has no language-ID token,
 so content language is set purely by the ``gen_text`` we feed. Feeding English
-transcripts keeps content English while the merged vector shifts the acoustics.
+transcripts keeps content English while the scaled vector shifts the acoustics.
 
-Two accent-vector tracks feed this (see AccentVector/README.md deviation #2):
+The accent vector is the LoRA branch (fine-tuning is always LoRA, the paper's
+Eq. 3), so the sweep is native: build the base+LoRA model ONCE and rescale the
+branch in place per alpha via ``lora_model.set_lora_alpha`` -- exactly
+``theta_pre + alpha*theta_LoRA``, with no checkpoint merge.
 
-* **LoRA (paper-matching, --lora).** The accent vector is the LoRA branch; the
-  sweep builds the model ONCE and rescales the branch in place per alpha via
-  ``lora_model.set_lora_alpha`` (no merge, exact ``theta_pre + alpha*theta_LoRA``).
-* **Full fine-tune (merged checkpoint).** ``extract_vector.compose`` merges
-  ``theta_pre + alpha*tau`` into a full checkpoint per alpha, which is then loaded.
-
-Modes
+Usage
 -----
-    # LoRA alpha sweep -- native, no merge (Eq. 3-4)
-    python -m accent_vector.infer_accent --lora \
+    python -m accent_vector.infer_accent \
         --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt \
-        --lora-vector vectors/british_lora.pt \
+        --lora-vector vectors/dutch.pt \
         --config exps/.../config.yaml --vocab exps/.../vocab.txt \
         --alphas 0,0.2,0.4,0.6,0.8,1.0 \
-        --ref-audio refs/england.wav --ref-text "..." \
-        --transcripts data/transcripts/eval_transcripts.txt \
-        --out-dir results/per-accent/british \
-        [--lora-label british --lora-mapping exps/.../lora_mapping.json]
+        --ref-audio data/prompts/dutch/dutch_f.wav --ref-text "..." \
+        --transcripts data/transcripts/dutch/dutch_f_eval.txt \
+        --out-dir results/per-accent/dutch \
+        [--lora-label dutch --lora-mapping exps/.../lora_mapping.json]
 
-    # full-fine-tune alpha sweep over a merged checkpoint diff (Eq. 4)
-    python -m accent_vector.infer_accent \
-        --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt \
-        --vector vectors/british.pt \
-        --alphas 0,0.2,0.4,0.6,0.8,1.0 \
-        --ref-audio refs/england.wav --ref-text "..." \
-        --transcripts data/transcripts/eval_transcripts.txt \
-        --out-dir results/per-accent/british
-
-    # synthesize a single, already-composed checkpoint (e.g. a mixed accent)
-    python -m accent_vector.infer_accent \
-        --ckpt ckpts/mixed/spanish+british.pt \
-        --ref-audio refs/england.wav --ref-text "..." \
-        --transcripts data/transcripts/eval_transcripts.txt \
-        --out-dir results/per-accent/spanish+british
+``--config`` / ``--vocab`` come from the training run dir: the LoRA architecture
+(rank, target modules) has to match the checkpoint the vector was trained with.
 """
 
 import argparse
 import os
-import tempfile
-from importlib.resources import files
 
 import soundfile as sf
 import torch
-from hydra.utils import get_class
-from omegaconf import OmegaConf
 
 from f5_tts.infer.utils_infer import (
     infer_process,
-    load_model,
-    load_vocoder,
     preprocess_ref_audio_text,
 )
 
-from accent_vector.extract_vector import compose
 
 
 def load_transcripts(path):
     with open(path, encoding="utf-8") as f:
         return [ln.strip() for ln in f if ln.strip()]
-
-
-def build_model(config_path, ckpt_path, vocab_file, device):
-    model_cfg = OmegaConf.load(config_path).model
-    model_cls = get_class(f"f5_tts.model.{model_cfg.backbone}")
-    mel_spec_type = model_cfg.mel_spec.mel_spec_type
-    model = load_model(
-        model_cls, model_cfg.arch, ckpt_path,
-        mel_spec_type=mel_spec_type, vocab_file=vocab_file, device=device,
-    )
-    return model, mel_spec_type
 
 
 def synthesize_set(model, vocoder, mel_spec_type, ref_audio, ref_text,
@@ -184,16 +149,12 @@ def main():
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="cuda:0")
 
-    # full-fine-tune sweep mode (merged checkpoint per alpha)
-    parser.add_argument("--pretrained", help="base checkpoint (theta_pre) for the sweep")
-    parser.add_argument("--vector", help="full-weight accent vector for the merged sweep")
-    parser.add_argument("--alphas", help="comma-separated strengths, e.g. 0,0.2,0.4,0.6,0.8,1.0")
-    # single-checkpoint mode
-    parser.add_argument("--ckpt", help="synthesize this pre-composed checkpoint directly")
-    # native-LoRA sweep mode (accent vector = LoRA branch; no merge)
-    parser.add_argument("--lora", action="store_true",
-                        help="native LoRA sweep: scale the LoRA branch by alpha in place")
-    parser.add_argument("--lora-vector", help="LoRA accent vector / snapshot (lora_state_dict)")
+    # the alpha sweep: base + LoRA branch, rescaled per alpha in place
+    parser.add_argument("--pretrained", required=True, help="base checkpoint (theta_pre)")
+    parser.add_argument("--alphas", required=True,
+                        help="comma-separated strengths, e.g. 0,0.2,0.4,0.6,0.8,1.0")
+    parser.add_argument("--lora-vector", required=True,
+                        help="LoRA accent vector / snapshot (lora_state_dict)")
     parser.add_argument("--lora-idx", type=int, default=None,
                         help="LoRA branch index (default: resolve via --lora-label/--lora-mapping, else 0)")
     parser.add_argument("--lora-label", help="accent label to look up in --lora-mapping")
@@ -220,56 +181,20 @@ def main():
 
     transcripts = load_transcripts(args.transcripts)
 
-    # --- native LoRA sweep: build once, rescale the branch per alpha ---
-    if args.lora:
-        from accent_vector.lora_model import resolve_lora_idx
-        if not (args.pretrained and args.lora_vector and args.alphas):
-            raise SystemExit("--lora sweep needs --pretrained, --lora-vector and --alphas")
-        if not (args.config and args.vocab):
-            raise SystemExit("--lora sweep needs --config and --vocab from the training run")
-        lora_idx = args.lora_idx if args.lora_idx is not None else \
-            resolve_lora_idx(args.lora_label, args.lora_mapping)
-        alphas = [float(a) for a in args.alphas.split(",")]
-        synthesize_lora_sweep(
-            args.pretrained, args.lora_vector, args.config, args.vocab, alphas,
-            args.ref_audio, args.ref_text, transcripts, args.out_dir,
-            args.nfe, args.seed, args.device, lora_idx=lora_idx,
-            include=include, exclude=exclude,
-            shard_index=args.shard_index, shard_count=args.shard_count,
-        )
-        return
-
-    config_path = args.config or str(
-        files("f5_tts").joinpath("configs/F5TTS_v1_Base.yaml")
-    )
-    vocoder = load_vocoder(vocoder_name="vocos")
-
-    if args.ckpt:
-        model, mel_spec_type = build_model(config_path, args.ckpt, args.vocab, args.device)
-        synthesize_set(
-            model, vocoder, mel_spec_type, args.ref_audio, args.ref_text,
-            transcripts, args.out_dir, args.nfe, args.seed, args.device,
-            shard_index=args.shard_index, shard_count=args.shard_count,
-        )
-        return
-
-    if not (args.pretrained and args.vector and args.alphas):
-        raise SystemExit("sweep mode needs --pretrained, --vector and --alphas (or use --ckpt)")
-
+    # --- the sweep: build base+LoRA once, rescale the branch per alpha ---
+    from accent_vector.lora_model import resolve_lora_idx
+    if not (args.config and args.vocab):
+        raise SystemExit("the sweep needs --config and --vocab from the training run")
+    lora_idx = args.lora_idx if args.lora_idx is not None else \
+        resolve_lora_idx(args.lora_label, args.lora_mapping)
     alphas = [float(a) for a in args.alphas.split(",")]
-    with tempfile.TemporaryDirectory() as tmp:
-        for alpha in alphas:
-            ckpt = os.path.join(tmp, f"accent_a{alpha}.pt")
-            compose(args.pretrained, [(args.vector, alpha)], ckpt,
-                    include=include, exclude=exclude, verbose=False)
-            model, mel_spec_type = build_model(config_path, ckpt, args.vocab, args.device)
-            synthesize_set(
-                model, vocoder, mel_spec_type, args.ref_audio, args.ref_text,
-                transcripts, os.path.join(args.out_dir, f"alpha_{alpha}"),
-                args.nfe, args.seed, args.device,
-                shard_index=args.shard_index, shard_count=args.shard_count,
-            )
-            os.remove(ckpt)
+    synthesize_lora_sweep(
+        args.pretrained, args.lora_vector, args.config, args.vocab, alphas,
+        args.ref_audio, args.ref_text, transcripts, args.out_dir,
+        args.nfe, args.seed, args.device, lora_idx=lora_idx,
+        include=include, exclude=exclude,
+        shard_index=args.shard_index, shard_count=args.shard_count,
+    )
 
 
 if __name__ == "__main__":

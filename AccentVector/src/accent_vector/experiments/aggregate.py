@@ -1,4 +1,4 @@
-"""[A1 aggregation] Pool per-speaker metric CSVs for an accent into a
+"""Pool per-speaker metric CSVs for an accent into a
 cross-speaker summary -- the "consistent across speakers?" check.
 
 Each speaker's sweep (``results/<accent>/<speaker>/``) is scored on its own with the

@@ -8,7 +8,7 @@ fixed. It runs post-hoc in the f5-tts inference env, decoupled from training.
 
 The accent vector is the LoRA branch, so alpha-scaling is native: pass --lora-alpha
 to fold tau at any strength (alpha=1 is the trained model; the RQ1 sweep is just
-several --lora-alpha values). No merged checkpoints needed. Shares its base+LoRA
+several --lora-alpha values), with no checkpoint merge. Shares its base+LoRA
 build with infer_accent via accent_vector.lora_model.
 
     python -m accent_vector.sample_checkpoints \

@@ -3,7 +3,7 @@ natural target accent.
 
 Writes ``rq3.csv`` (one row per alpha) -- the file the figures notebook reads for
 RQ3 (Ch.4). Named for what it computes rather than for a question number.
-Formerly ``experiments/rq3_decomposition.py`` [E3.1-3.3].
+Formerly ``experiments/rq3_decomposition.py``.
 
 As alpha increases, does the accent vector move SEGMENTAL structure (phone
 realisation) and SUPRASEGMENTAL structure (pitch, rhythm, tempo) toward the

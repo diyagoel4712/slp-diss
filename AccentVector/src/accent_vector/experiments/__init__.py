@@ -6,7 +6,7 @@ actually depends on lives one level up in ``accent_vector/``:
     data_preprocess -> (finetune on Eddie) -> extract_vector -> infer_accent
                     -> score_sweep / score_prosody -> ../notebooks/dissertation_figures.ipynb
 
-The modules below were written against the experiment matrix in EXPERIMENTS.md
+The modules below were written against the experiment matrix
 but produced no output in this checkout: none of ``temporal.csv``,
 ``by_step_summary.csv``, ``weight_space_cosine.csv``, ``rq3_layers.csv``,
 ``gram.csv`` or ``aggregate.csv`` exists anywhere under AccentVector/. They are

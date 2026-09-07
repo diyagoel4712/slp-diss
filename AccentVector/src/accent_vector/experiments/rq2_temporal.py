@@ -23,17 +23,12 @@ Tip: pass ``--include ema_model_state_dict`` to track the weights inference
 actually uses; optimizer moments are dropped by default (they aren't part of the
 accent vector and would pollute magnitude/direction).
 
+The accent vector IS the LoRA weights, so tau_t is read straight from the
+``lora_<step>.pt`` snapshots -- point ``--ckpt-dir`` at the snapshots dir:
+
     python -m accent_vector.experiments.rq2_temporal \
-        --pretrained ckpts/F5TTS_v1_Base/model_1250000.pt \
-        --ckpt-dir ckpts/british --include ema_model_state_dict \
-        --out-csv results/per-accent/british/temporal.csv
-
-For a LoRA fine-tune the accent vector IS the LoRA weights, so pass ``--lora`` and
-point ``--ckpt-dir`` at the snapshots dir (no ``--pretrained`` needed):
-
-    python -m accent_vector.experiments.rq2_temporal --lora \
-        --ckpt-dir exps/F5TTS_v1_LoRA_british/<run>/ckpts/snapshots \
-        --out-csv results/per-accent/british/temporal.csv
+        --ckpt-dir exps/F5TTS_v1_LoRA_dutch/<run>/ckpts/snapshots \
+        --out-csv results/per-accent/dutch/temporal.csv
 """
 
 import argparse
@@ -44,11 +39,7 @@ from pathlib import Path
 import numpy as np
 
 from accent_vector import shared
-from accent_vector.extract_vector import (
-    _key_selected,
-    compute_task_vector,
-    load_flat_checkpoint,
-)
+from accent_vector.extract_vector import _key_selected
 
 DEFAULT_EXCLUDE = ["optimizer"]  # drop Adam moments; not part of the accent vector
 
@@ -95,34 +86,13 @@ def _vector_1d_lora(ckpt_path, include, exclude):
     return keys, vec
 
 
-def _vector_1d(pretrained_flat, ckpt_path, include, exclude):
-    """tau_t = theta_t - theta_pre flattened to one 1-D array over selected float
-    tensors in sorted-key order (stable across checkpoints so cosines are valid)."""
-    ft = load_flat_checkpoint(ckpt_path)
-    diff, _ = compute_task_vector(pretrained_flat, ft, verbose=False)
-    keys = sorted(k for k in diff if _key_selected(k, include, exclude))
-    if not keys:
-        raise SystemExit(f"no selected float tensors in {ckpt_path} "
-                         f"(include={include}, exclude={exclude})")
-    vec = np.concatenate([diff[k].detach().cpu().float().numpy().ravel() for k in keys])
-    return keys, vec
-
-
-def run(pretrained, ckpt_dir, out_csv, threshold=0.95, include=None, exclude=None,
-        final_ckpt=None, lora=False):
+def run(ckpt_dir, out_csv, threshold=0.95, include=None, exclude=None,
+        final_ckpt=None):
     exclude = exclude if exclude is not None else DEFAULT_EXCLUDE
-    if lora:
-        pre = None
-        ckpts = collect_checkpoints(ckpt_dir, prefix="lora_")
-        if not ckpts:
-            raise SystemExit(f"no lora_<step>.pt snapshots found in {ckpt_dir}")
-        vec_of = lambda path: _vector_1d_lora(path, include, exclude)
-    else:
-        pre = load_flat_checkpoint(pretrained)
-        ckpts = collect_checkpoints(ckpt_dir)
-        if not ckpts:
-            raise SystemExit(f"no model_<step>.pt checkpoints found in {ckpt_dir}")
-        vec_of = lambda path: _vector_1d(pre, path, include, exclude)
+    ckpts = collect_checkpoints(ckpt_dir, prefix="lora_")
+    if not ckpts:
+        raise SystemExit(f"no lora_<step>.pt snapshots found in {ckpt_dir}")
+    vec_of = lambda path: _vector_1d_lora(path, include, exclude)
 
     final_path = final_ckpt or ckpts[-1][1]
     keys_final, v_final = vec_of(final_path)
@@ -162,12 +132,8 @@ def run(pretrained, ckpt_dir, out_csv, threshold=0.95, include=None, exclude=Non
 
 def main():
     p = argparse.ArgumentParser(description="RQ2/Tier1 accent-vector fine-tuning trajectory")
-    p.add_argument("--lora", action="store_true",
-                   help="LoRA mode: build tau_t from lora_<step>.pt snapshots directly "
-                        "(tau = theta_LoRA, zero baseline); --pretrained not needed")
-    p.add_argument("--pretrained", help="base checkpoint theta_pre (full-FT mode only)")
     p.add_argument("--ckpt-dir", required=True,
-                   help="dir of model_<step>.pt checkpoints, or lora_<step>.pt snapshots with --lora")
+                   help="dir of lora_<step>.pt snapshots")
     p.add_argument("--final-ckpt", help="reference tau_final (default: highest-step checkpoint)")
     p.add_argument("--threshold", type=float, default=0.95, help="convergence threshold")
     p.add_argument("--include", action="append", default=[],
@@ -176,10 +142,8 @@ def main():
                    help="drop these key substrings (default: optimizer)")
     p.add_argument("--out-csv", required=True)
     a = p.parse_args()
-    if not a.lora and not a.pretrained:
-        p.error("--pretrained is required unless --lora is set")
-    run(a.pretrained, a.ckpt_dir, a.out_csv, threshold=a.threshold,
-        include=a.include or None, exclude=a.exclude, final_ckpt=a.final_ckpt, lora=a.lora)
+    run(a.ckpt_dir, a.out_csv, threshold=a.threshold,
+        include=a.include or None, exclude=a.exclude, final_ckpt=a.final_ckpt)
 
 
 if __name__ == "__main__":
