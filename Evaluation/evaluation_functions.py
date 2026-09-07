@@ -1,19 +1,7 @@
 # define evaluation metrics -- to be called in an .ipynb file
 
-# 1. UTMOS
-def utmos(input_dir):
-    """
-    automated mean opinion score (MOS) (Baba et al., 2024)
-    IN: str: path to folder containing wav files
-    OUT: lst: list of dicts with 'file_path' and 'predicted_mos' keys
-    """
-    import utmosv2
-    model = utmosv2.create_model(pretrained=True)
-    mos = model.predict(input_dir=input_dir)
-    return mos
-
 # -----------------------------------------------------------------------------------------------------------------------
-# 2. F0 RMSE
+# 1. F0 RMSE
 def f0_rmse(synthesised_audio_file, ground_truth_audio_file, **kwargs):
     """
     Root mean squared error (RMSE) in the fundamental frequency (F0) of synthesised speech and natural speech from corpus.

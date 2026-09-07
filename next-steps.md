@@ -22,6 +22,9 @@
     [ ] Add a text divergence metric as a loss term when finetuning
     [ ] Add some English data along with foreign language data
 
+[ ] More experiments
+    [ ] Is ‖τ‖ systematically larger for OOD languages than Mandarin?
+
 [ ] Better finetuning
     [ ] Decide on a principled number of finetuning steps per accent
 
@@ -29,15 +32,21 @@
     [ ] Are reported KL-PPG scores reliable?
     [ ] Try different ASR model for KL-PPG
     [ ] Alternative for GenAID AccentCS
+    [ ] Compute LID to report against Lertputchpun et al. (2026)
+    [ ] Add clearer reporting of language leakage onset point (alpha value)
 
 [ ] Accent arithmetic
     [ ] 
 
 [ ] Code clean-up
     [x] Remove redundant visualisation scripts
+    [x] Reorganise codebase
+    [ ] Rewrite documentation
+    [ ] Remove scripts no longer used
     [ ] Add IPA vowel chart visualisation
     [ ] Record modifications from F5-TTS and HE-vector repos
     [ ] Push changes from Eddie and resolve merge conflicts
+    [ ] Read all files
 
 [x] Writing
     [x] Minor corrections

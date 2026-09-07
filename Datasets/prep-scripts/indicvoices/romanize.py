@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 Romanise a native-script metadata.csv (Devanagari / Bengali) into Latin so F5's base
-vocab (Latin + pinyin only) can tokenise it. Native transcripts otherwise tokenise to
-id 0 -- see AccentVector PROPOSAL.md gotcha #2 / README "Non-Latin transcripts".
+vocab (Latin + pinyin only) can tokenise it. 
 
 Reads  <clips>/metadata.csv         (audio_file|text, native script; from prep_indicvoices_f5)
 Writes <clips>/metadata.roman.csv   (audio_file|text, romanised)

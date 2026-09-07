@@ -2,7 +2,7 @@
 # Used by evaluation_functions.py for the metrics that run natively:
 #   #2 F0 RMSE, #3 MCD, #4 WER, #7 PPG-KL
 # (#5 AccentID, #6 CS-accent, #8 speaker-sim run in the separate genaid env --
-#  see requirements-genaid.txt. #1 UTMOS uses utmosv2 from the root pyproject.toml.)
+#  see requirements-genaid.txt.)
 #
 # Install into the .conda env:
 #   uv pip install --python /path/to/.conda/bin/python -r requirements-eval.txt

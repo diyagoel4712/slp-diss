@@ -15,30 +15,28 @@ dissertation pipeline depends on: `AccentVector`'s `shared.load_eval()` imports 
 
 | # | Function | Measures | Backend | Env |
 |---|----------|----------|---------|-----|
-| 1 | `utmos` | naturalness (MOS) | utmosv2 | root `.venv` |
-| 2 | `f0_rmse` | prosody / pitch (mel-scaled) | librosa pyin | `.conda` |
-| 3 | `mcd` | spectral envelope | librosa MFCC + DTW | `.conda` |
-| 4 | `wer` | intelligibility | Whisper + jiwer | `.conda` |
-| 5 | `aid_acc` | accent-ID accuracy | GenAID | `genaid` |
-| 6 | `cs_accent` | accent-embedding cosine sim | GenAID embeddings | `genaid` |
-| 7 | `ppg_kl` | segmental pronunciation | wav2vec2 phoneme-CTC | `.conda` |
-| 8 | `speaker_similarity` | speaker identity (SECS) | ECAPA-TDNN | `genaid` |
-| 9 | `predict_lid_english` | spoken language-ID, P(English) (RQ1 leakage) | VoxLingua107 ECAPA | `genaid` |
+| 1 | `f0_rmse` | prosody / pitch (mel-scaled) | librosa pyin | `.conda` |
+| 2 | `mcd` | spectral envelope | librosa MFCC + DTW | `.conda` |
+| 3 | `wer` | intelligibility | Whisper + jiwer | `.conda` |
+| 4 | `aid_acc` | accent-ID accuracy | GenAID | `genaid` |
+| 5 | `cs_accent` | accent-embedding cosine sim | GenAID embeddings | `genaid` |
+| 6 | `ppg_kl` | segmental pronunciation | wav2vec2 phoneme-CTC | `.conda` |
+| 7 | `speaker_similarity` | speaker identity (SECS) | ECAPA-TDNN | `genaid` |
+| 8 | `predict_lid_english` | spoken language-ID, P(English) (RQ1 leakage) | VoxLingua107 ECAPA | `genaid` |
 
 Which of these the accent-vector eval actually calls, and how, is in
-`AccentVector/src/accent_vector/score_sweep.py` (1, 4, 5, 6, 8, 9) and
-`score_prosody.py` (7 plus the suprasegmental descriptors).
+`AccentVector/src/accent_vector/score_sweep.py` (3, 5, 7, 8) and
+`score_prosody.py` (6 plus the suprasegmental descriptors).
 
 ## Why two environments
 
 The metrics span two Python environments because GenAID requires SpeechBrain
 0.5.x, whose old pins conflict with the modern `transformers`/`torch` used by the
 other metrics. `evaluation_functions.py` runs in **`.conda`** and calls the
-**`genaid`** env as a subprocess for metrics 5/6/8.
+**`genaid`** env as a subprocess for metrics 4/5/7.
 
 - **`.conda`** (Python 3.11) — F0/MCD/WER/PPG-KL. See `requirements-eval.txt`.
 - **`genaid`** (Python 3.10) — accent-ID + speaker embeddings. See `requirements-genaid.txt`.
-- Root **`.venv`** (uv, Python 3.13) — UTMOS only (`utmosv2`, declared in `../pyproject.toml`).
 
 `_GENAID_PYTHON` in `evaluation_functions.py` hardcodes the genaid interpreter path
 — update it if your conda prefix differs (or set `GENAID_PYTHON` / `GENAID_DIR`).
@@ -47,7 +45,7 @@ On Eddie, both envs are built by `AccentVector/scripts/eddie_eval_setup.sh`, whi
 installs from the two requirements files here and copies the wrappers into the GenAID
 clone. That script is the authoritative version of the setup below.
 
-## .conda env setup (metrics 2/3/4/7)
+## .conda env setup (metrics 1/2/3/6)
 
 ```bash
 uv pip install --python /path/to/.conda/bin/python -r requirements-eval.txt
@@ -56,7 +54,7 @@ uv pip install --python /path/to/.conda/bin/python -r requirements-eval.txt
 First runs download model weights (cached after): Whisper `base.en` (~140 MB) for
 WER; `facebook/wav2vec2-lv-60-espeak-cv-ft` (~1.2 GB) for PPG-KL.
 
-## genaid env setup (metrics 5/6/8)
+## genaid env setup (metrics 4/5/7)
 
 > ⚠️ `GenAID/` is gitignored (third-party clone), so the steps below — including our
 > wrapper scripts and source patches — are NOT in version control and must be reapplied
@@ -80,7 +78,7 @@ gdown "https://drive.google.com/uc?id=1slGrpZSu5g-nF7R-QMCmtGcjN3kw7lQj" -O GenA
 unzip GenAID_ckpt.zip && rm GenAID_ckpt.zip
 ```
 
-ECAPA (#8) auto-downloads from the HuggingFace Hub on first run. The XLSR backbone for GenAID also downloads on first run.
+ECAPA (#7) auto-downloads from the HuggingFace Hub on first run. The XLSR backbone for GenAID also downloads on first run.
 
 ### Wrapper scripts (place in `recipes/CommonAccent/`)
 
@@ -90,8 +88,8 @@ ECAPA (#8) auto-downloads from the HuggingFace Hub on first run. The XLSR backbo
 > `recipes/CommonAccent/` on a fresh checkout.
 
 - `predict_GenAID.py` — GenAID accent label + posteriors + embedding per wav.
-- `predict_speaker_embeddings.py` — ECAPA-TDNN speaker embeddings (#8).
-- `predict_lid.py` — VoxLingua107 ECAPA spoken-LID, P(English) per wav (#9,
+- `predict_speaker_embeddings.py` — ECAPA-TDNN speaker embeddings (#7).
+- `predict_lid.py` — VoxLingua107 ECAPA spoken-LID, P(English) per wav (#8,
   RQ1 language leakage). Auto-downloads `speechbrain/lang-id-voxlingua107-ecapa` on first run;
   locates the English class by ISO code `en`. Same librosa-load / `classify_batch`
   pattern as the other wrappers (patch #3 below).

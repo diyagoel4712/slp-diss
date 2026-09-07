@@ -1,15 +1,10 @@
 [project]
 name = "slp-diss"
 version = "0.1.0"
-description = "Add your description here"
+description = "MSc dissertation: task arithmetic for zero-shot accented TTS on F5-TTS"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
-    "utmosv2",
-]
+dependencies = []
 
 [tool.uv.workspace]
 members = []
-
-[tool.uv.sources]
-utmosv2 = { git = "https://github.com/sarulab-speech/UTMOSv2.git" }
