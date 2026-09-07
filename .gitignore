@@ -247,3 +247,8 @@ SOTA_models_experiments/vits/
 outputs/
 *.wav
 *.flac
+
+# Third-party model clone with its own .git (3.7 GB). main ignores this at
+# Evaluation/GenAID/; this branch predates that rule, so `git add Evaluation/`
+# staged it as a gitlink instead of skipping it.
+Evaluation/GenAID/
