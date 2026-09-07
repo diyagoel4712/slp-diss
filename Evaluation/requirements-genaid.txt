@@ -1,6 +1,6 @@
 # Accent-ID / embedding environment ("genaid", Python 3.10)
 # Used (via subprocess) by evaluation_functions.py for:
-#   #5 AccentID accuracy (GenAID + CommonAccent), #6 CS accent embeddings,
+#   #5 AccentID accuracy (GenAID), #6 CS accent embeddings,
 #   #8 speaker similarity (ECAPA-TDNN).
 #
 # This env is deliberately separate from .conda because SpeechBrain 0.5.x pins old

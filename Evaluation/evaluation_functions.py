@@ -219,36 +219,6 @@ def predict_accent_genaid(wav_files, device="cpu", with_embeddings=False):
     with open(out_path) as fh:
         return json.load(fh)
 
-# Secondary accent classifier (SpeechBrain CommonAccent ECAPA) for a sanity check.
-
-# Match accents between CommonAccent and VCTK
-COMMONACCENT_TO_VCTK = {
-    "us": "American", "england": "English", "australia": "Australian",
-    "indian": "Indian", "canada": "Canadian", "scotland": "Scottish",
-    "ireland": "Irish", "newzealand": "NewZealand", "wales": "Welsh",
-    "african": "SouthAfrican",
-}
-
-def predict_accent_commonaccent(wav_files, device="cpu"):
-    """
-    run the CommonAccent ECAPA classifier (isolated env) -> list of dicts with
-    'wav', 'pred_accent', 'posteriors'. Use as the secondary predict_fn in aid_acc.
-    """
-    import json, subprocess, tempfile
-
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
-        f.write("\n".join(wav_files))
-        list_path = f.name
-    out_path = list_path + ".ca.json"
-
-    subprocess.run(
-        [_GENAID_PYTHON, "predict_commonaccent.py",
-         "--wav_list", list_path, "--device", device, "--out", out_path],
-        cwd=_GENAID_DIR, check=True,
-    )
-    with open(out_path) as fh:
-        return json.load(fh)
-
 def aid_acc(synthesised_files, target_accents, predict_fn=predict_accent_genaid,
             label_map=GENAID_TO_VCTK):
     """

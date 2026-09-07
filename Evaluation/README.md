@@ -19,7 +19,7 @@ dissertation pipeline depends on: `AccentVector`'s `shared.load_eval()` imports 
 | 2 | `f0_rmse` | prosody / pitch (mel-scaled) | librosa pyin | `.conda` |
 | 3 | `mcd` | spectral envelope | librosa MFCC + DTW | `.conda` |
 | 4 | `wer` | intelligibility | Whisper + jiwer | `.conda` |
-| 5 | `aid_acc` | accent-ID accuracy | GenAID (+ CommonAccent) | `genaid` |
+| 5 | `aid_acc` | accent-ID accuracy | GenAID | `genaid` |
 | 6 | `cs_accent` | accent-embedding cosine sim | GenAID embeddings | `genaid` |
 | 7 | `ppg_kl` | segmental pronunciation | wav2vec2 phoneme-CTC | `.conda` |
 | 8 | `speaker_similarity` | speaker identity (SECS) | ECAPA-TDNN | `genaid` |
@@ -80,18 +80,16 @@ gdown "https://drive.google.com/uc?id=1slGrpZSu5g-nF7R-QMCmtGcjN3kw7lQj" -O GenA
 unzip GenAID_ckpt.zip && rm GenAID_ckpt.zip
 ```
 
-CommonAccent (#5 secondary) and ECAPA (#8) auto-download from the HuggingFace Hub on
-first run. The XLSR backbone for GenAID also downloads on first run.
+ECAPA (#8) auto-downloads from the HuggingFace Hub on first run. The XLSR backbone for GenAID also downloads on first run.
 
 ### Wrapper scripts (place in `recipes/CommonAccent/`)
 
 > `GenAID/` is an **embedded git clone** (has its own `.git`), so files inside it
 > can't be tracked by the parent repo. The tracked source of truth lives in
-> `Evaluation/genaid_wrappers/` (all four); copy them into the clone's
+> `Evaluation/genaid_wrappers/` (all three); copy them into the clone's
 > `recipes/CommonAccent/` on a fresh checkout.
 
 - `predict_GenAID.py` — GenAID accent label + posteriors + embedding per wav.
-- `predict_commonaccent.py` — CommonAccent ECAPA secondary classifier.
 - `predict_speaker_embeddings.py` — ECAPA-TDNN speaker embeddings (#8).
 - `predict_lid.py` — VoxLingua107 ECAPA spoken-LID, P(English) per wav (#9,
   RQ1 language leakage). Auto-downloads `speechbrain/lang-id-voxlingua107-ecapa` on first run;
@@ -108,7 +106,7 @@ these edits:
 2. `speechbrain/pretrained/interfaces.py` — in `from_hparams`, broaden the optional
    pymodule fetch `except ValueError:` → `except Exception:` (modern hub raises
    `EntryNotFoundError`, not `ValueError`, when the optional `custom.py` is absent).
-3. In `predict_commonaccent.py` / `predict_speaker_embeddings.py`, load audio with
+3. In `predict_speaker_embeddings.py`, load audio with
    `librosa` and call `classify_batch` / `encode_batch` instead of `classify_file`
    (avoids torchaudio's `torchcodec` backend dependency).
 4. `speechbrain/lobes/models/huggingface_wav2vec.py` — in `_check_model_source`, wrap the
@@ -124,9 +122,12 @@ checkpoint's `ModuleList` loads positionally.
 
 ## Notes / caveats for the writeup
 
-- **Accent taxonomy**: GenAID's 13 classes don't fully cover VCTK — `Welsh` and
-  `NorthernIrish` have no GenAID class (see `GENAID_TO_VCTK`). Exclude or handle them
-  explicitly. CommonAccent has 16 classes (incl. `wales`).
+- **Accent taxonomy**: GenAID's 13 classes don't cover the accents studied — Dutch has
+  no class, Bengali collapses into `southasian` (see `GENAID_TO_VCTK`). This is why the
+  accent-vector eval scores `cs_accent` (embedding cosine) rather than `aid_acc` (label
+  match); the reasoning is in `AccentVector/src/accent_vector/score_sweep.py`. A
+  CommonAccent ECAPA secondary classifier was wired as an alternative `predict_fn` and
+  removed unused — it is in git history if a second opinion on labels is ever wanted.
 - **Model bias**: WER, PPG-KL, accent-ID and speaker-sim all inherit their backbone
   models' biases — declare the models used.
 - **CPU**: all envs verified on macOS CPU (2026-06-15); GPU is faster but optional.

@@ -5,7 +5,7 @@ signal that WER conflates with the ASR's accent penalty.
 
 Loads speechbrain/lang-id-voxlingua107-ecapa from the HuggingFace Hub and emits,
 per wav, the posterior mass on English plus the top predicted language, as a JSON
-list (same shape/plumbing as predict_commonaccent.py).
+list (same shape/plumbing as predict_speaker_embeddings.py).
 
 VoxLingua107 labels are ``"<iso>: <Language>"`` (e.g. ``"en: English"``); English
 is located by its ISO code ``en`` so it is robust to label formatting.
