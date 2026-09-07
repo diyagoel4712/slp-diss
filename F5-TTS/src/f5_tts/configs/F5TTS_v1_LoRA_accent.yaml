@@ -19,7 +19,7 @@ datasets:
 
 optim:
   epochs: 100             # generous budget; you stop manually via the STOP sentinel file
-  learning_rate: 1e-4     # small-corpus LoRA lr
+  learning_rate: 3e-5     # matches Lertpetchpun et al. (Adam, lr 3e-5) -- paper-faithful
   num_warmup_updates: 200  # was 20000 (Emilia-scale); far fewer updates on one accent
   grad_accumulation_steps: 1
   max_grad_norm: 1.0
@@ -45,7 +45,7 @@ model:
     attn_mask_enabled: False
     checkpoint_activations: False
     use_lora: True
-    lora_rank: 64
+    lora_rank: 16           # matches Lertpetchpun et al. (paper-faithful reproduction)
     lora_feature_dim: null  # single LoRA per run (one accent -> one vector)
   mel_spec:
     target_sample_rate: 24000
@@ -65,11 +65,12 @@ ckpts:
   wandb_run_name: ${model.name}_${datasets.name}
   log_samples: True       # dump a gen/ref wav each sample_per_updates
   save_per_updates: 500   # default fallback cadence + wandb param-histogram log_freq
-  sample_per_updates: 500  # RQ6: gen/ref sample + WER cadence -> ~20 WER points over a 10k-step run
-  track_wer: True         # transcribe each sample with multilingual ASR and log WER (RQ6 intelligibility-vs-steps)
+  sample_per_updates: 500  # gen/ref sample + WER cadence -> ~20 WER points over a 10k-step run
+  track_wer: True         # transcribe each sample with multilingual ASR and log WER
+                          # (intelligibility vs training step)
   asr_language: null      # ISO code for the ASR, e.g. nl/de/fr; null = Whisper autodetect. Override per accent on the CLI.
   asr_model_name: large-v3  # faster-whisper multilingual model (large-v3 covers the accent L1s)
-  snapshot_per_updates: 100  # cheap LoRA-only snapshot cadence -> RQ6 trajectory granularity
+  snapshot_per_updates: 100  # cheap LoRA-only snapshot cadence -> RQ1b trajectory granularity
   keep_last_n_checkpoints: -1  # keep all (snapshots are tiny; full model_last is overwritten)
   last_per_updates: 500
   save_dir: ${hydra:run.dir}

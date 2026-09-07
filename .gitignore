@@ -233,7 +233,7 @@ arctic.data
 # is gitignored wholesale below.
 Evaluation/GenAID/
 CLARITY/
-F5-TTS/
+# F5-TTS/
 Expressive-Vectors/
 qualtreats/
 lang2vec/

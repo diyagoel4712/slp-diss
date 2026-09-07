@@ -1,15 +1,17 @@
-# SOTA models — evaluation
+# Evaluation — the shared objective-metric suite
 
-The goal of this folder is to run evaluation across a range of open-source models to assess their accent-generation capabilities, and thereby define the problem space that current models face when generating text in different accents. 
+`evaluation_functions.py` implements the objective metrics used to compare synthesised
+speech against natural reference speech. It is the one piece of this folder the
+dissertation pipeline depends on: `AccentVector`'s `shared.load_eval()` imports it, and
+`score_sweep.py` / `score_prosody.py` compute `rq1.csv` / `rq3.csv` through it.
 
-We prompt each model with 4 utterances, each to be synthesised in 4 different accents by 5 different speakers. Each speaker-utterance combination is evaluated against a reference speech sample.
+> **The SOTA baseline benchmark that this folder started as has been archived** on the
+> `stale-branch-PAE` branch (`Evaluation/`, alongside its earlier notebook generation in
+> `SOTA_models_experiments/`). That is where `synthesis_driver.py`, `run_eval.py`,
+> `eval_config.py`, `visualize_results.py`, `backfill_metrics.py`, `run_pipeline.sh`,
+> `arctic.data` and `evaluation_results.csv` now live. Nothing on `main` imports them.
 
-All models are zero-shot. Some models (XTTS-2, VITS and F5) require reference speech, while others (CosyVoice3 and Parler-TTS) require natural language descriptions of desired speaker characteristics.
-
-The chosen accents are: Arabic, Indian, Vietnamese and Korean.
-
-`evaluation_functions.py` implements eight objective metrics for comparing
-synthesised speech against natural reference speech (VCTK).
+## Metrics
 
 | # | Function | Measures | Backend | Env |
 |---|----------|----------|---------|-----|
@@ -23,6 +25,10 @@ synthesised speech against natural reference speech (VCTK).
 | 8 | `speaker_similarity` | speaker identity (SECS) | ECAPA-TDNN | `genaid` |
 | 9 | `predict_lid_english` | spoken language-ID, P(English) (RQ1 leakage) | VoxLingua107 ECAPA | `genaid` |
 
+Which of these the accent-vector eval actually calls, and how, is in
+`AccentVector/src/accent_vector/score_sweep.py` (1, 4, 5, 6, 8, 9) and
+`score_prosody.py` (7 plus the suprasegmental descriptors).
+
 ## Why two environments
 
 The metrics span two Python environments because GenAID requires SpeechBrain
@@ -35,7 +41,11 @@ other metrics. `evaluation_functions.py` runs in **`.conda`** and calls the
 - Root **`.venv`** (uv, Python 3.13) — UTMOS only (`utmosv2`, declared in `../pyproject.toml`).
 
 `_GENAID_PYTHON` in `evaluation_functions.py` hardcodes the genaid interpreter path
-— update it if your conda prefix differs.
+— update it if your conda prefix differs (or set `GENAID_PYTHON` / `GENAID_DIR`).
+
+On Eddie, both envs are built by `AccentVector/scripts/eddie_eval_setup.sh`, which
+installs from the two requirements files here and copies the wrappers into the GenAID
+clone. That script is the authoritative version of the setup below.
 
 ## .conda env setup (metrics 2/3/4/7)
 
@@ -48,24 +58,24 @@ WER; `facebook/wav2vec2-lv-60-espeak-cv-ft` (~1.2 GB) for PPG-KL.
 
 ## genaid env setup (metrics 5/6/8)
 
-> ⚠️ `GenAID/` is gitignored (third-party clone, like the other model dirs), so the
-> steps below — including our wrapper scripts and source patches — are NOT in version
-> control and must be reapplied on a fresh checkout.
+> ⚠️ `GenAID/` is gitignored (third-party clone), so the steps below — including our
+> wrapper scripts and source patches — are NOT in version control and must be reapplied
+> on a fresh checkout.
 
 ```bash
 # 1. Clone the GenAID fork (a SpeechBrain v0.5.16 fork)
-git clone https://github.com/jzmzhong/GenAID.git SOTA_models_experiments/GenAID
+git clone https://github.com/jzmzhong/GenAID.git Evaluation/GenAID
 
 # 2. Create the env + install (CPU torch; use the pytorch CUDA index on Linux/GPU)
 conda create -n genaid python=3.10 -y
 conda run -n genaid pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
-conda run -n genaid pip install -r SOTA_models_experiments/requirements-genaid.txt
-conda run -n genaid pip install --editable SOTA_models_experiments/GenAID
+conda run -n genaid pip install -r Evaluation/requirements-genaid.txt
+conda run -n genaid pip install --editable Evaluation/GenAID
 
 # 3. Download the trained GenAID checkpoint (Google Drive, ~1.1 GB) and unzip
 #    into recipes/CommonAccent/GenAID_v6/ (contains save/<CKPT...>/{model,wav2vec2}.ckpt
 #    and save/accent_encoder.txt)
-cd SOTA_models_experiments/GenAID/recipes/CommonAccent
+cd Evaluation/GenAID/recipes/CommonAccent
 gdown "https://drive.google.com/uc?id=1slGrpZSu5g-nF7R-QMCmtGcjN3kw7lQj" -O GenAID_ckpt.zip
 unzip GenAID_ckpt.zip && rm GenAID_ckpt.zip
 ```
@@ -79,8 +89,6 @@ first run. The XLSR backbone for GenAID also downloads on first run.
 > can't be tracked by the parent repo. The tracked source of truth lives in
 > `Evaluation/genaid_wrappers/` (all four); copy them into the clone's
 > `recipes/CommonAccent/` on a fresh checkout.
-
-Copy these from version control / this dissertation's records into the clone:
 
 - `predict_GenAID.py` — GenAID accent label + posteriors + embedding per wav.
 - `predict_commonaccent.py` — CommonAccent ECAPA secondary classifier.

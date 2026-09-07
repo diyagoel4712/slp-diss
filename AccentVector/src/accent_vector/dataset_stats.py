@@ -44,7 +44,7 @@ import os
 import statistics as stats
 from pathlib import Path
 
-# defaults mirror scripts/F5TTS_v1_LoRA_accent.yaml + its mel_spec block
+# defaults mirror the fork's src/f5_tts/configs/F5TTS_v1_LoRA_accent.yaml + its mel_spec block
 FRAMES_PER_BATCH = 9600
 MAX_SAMPLES = 32
 HOP_LENGTH = 256

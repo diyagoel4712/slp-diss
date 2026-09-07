@@ -1,0 +1,12 @@
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# Local weights and corpora — never committed to the fork
+ckpts/
+data/
+
+# Training / inference outputs
+outputs/
+wandb/
+*.wav

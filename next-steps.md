@@ -34,9 +34,11 @@
     [ ] 
 
 [ ] Code clean-up
-    [ ] Remove redundant visualisation scripts
+    [x] Remove redundant visualisation scripts
     [ ] Add IPA vowel chart visualisation
     [ ] Record modifications from F5-TTS and HE-vector repos
+    [ ] Push changes from Eddie and resolve merge conflicts
 
 [x] Writing
     [x] Minor corrections
+    [x] Add GitHub link

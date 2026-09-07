@@ -15,12 +15,11 @@ Usage
 -----
     python scripts/patch_f5_tts_fork.py [--f5-root /path/to/F5-TTS]
 
-Also installs F5TTS_v1_LoRA_accent.yaml itself if it's missing: that config
-isn't part of the upstream Expressive-Vectors fork at all -- it's a config
-custom-authored for this dissertation's small-single-accent recipe (layered
-over the fork's own F5TTS_v1_LoRA.yaml), so a fresh clone never has it. This
-script carries the fixed copy (scripts/F5TTS_v1_LoRA_accent.yaml, tracked in
-git alongside this script) and copies it into place if absent.
+Also VERIFIES F5TTS_v1_LoRA_accent.yaml, which is dissertation-authored rather
+than upstream and now lives in the F5-TTS fork repo itself. Earlier versions of
+this script copied it in from a second copy under scripts/; the two then drifted
+(the installed one trained at lr 1e-4 / rank 64 while the scripts/ copy claimed
+the paper-faithful 3e-5 / 16), so the copy is gone and the check is loud.
 
 Bugs fixed (all in F5-TTS/src, discovered running the toy LoRA pipeline on a
 Mac -- see AccentVector conversation history for full crash traces):
@@ -48,12 +47,14 @@ Mac -- see AccentVector conversation history for full crash traces):
 
 import argparse
 import os
-import shutil
+import re
 import sys
 
 # Not part of the upstream fork -- installed fresh (already fixed) if absent.
-CONFIG_TEMPLATE = "F5TTS_v1_LoRA_accent.yaml"
 CONFIG_DEST = "src/f5_tts/configs/F5TTS_v1_LoRA_accent.yaml"
+# The recipe the dissertation reports (Lertpetchpun et al.): if the installed
+# config ever stops matching these, training would silently contradict the text.
+PINNED_HPARAMS = {"learning_rate": "3e-5", "lora_rank": "16"}
 
 PATCHES = [
     dict(
@@ -103,23 +104,42 @@ PATCHES = [
 ]
 
 
-def install_config(f5_root):
-    """Copy the fixed F5TTS_v1_LoRA_accent.yaml into place if the fork doesn't
-    have it -- it's dissertation-authored, not upstream, so a fresh clone
-    never ships it. No-op (reports already-present) if it's already there."""
+def verify_config(f5_root):
+    """Check the fork's F5TTS_v1_LoRA_accent.yaml still carries the dissertation's
+    pinned hyperparameters.
+
+    This used to COPY a second copy of the config in from scripts/ when the fork
+    lacked one. That silently created two copies which then drifted: the scripts/
+    copy was updated to the paper-faithful values while the installed copy -- the
+    one Hydra actually loads -- stayed at lr 1e-4 / rank 64 for months, because
+    "install if missing" never fires on a fork that already has the file.
+
+    The fork now owns the config (it is committed in the F5-TTS repo), so there is
+    nothing to install. What is left is the check that matters: fail loudly if the
+    values the write-up claims are not the values that would train.
+    """
     dest = os.path.join(f5_root, CONFIG_DEST)
-    if os.path.isfile(dest):
-        print(f"[OK]   {CONFIG_DEST}: already present")
-        return "already"
-    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), CONFIG_TEMPLATE)
-    if not os.path.isfile(src):
-        print(f"[WARN] {CONFIG_DEST}: missing, and template {src} not found either -- "
-              f"copy it by hand.")
+    if not os.path.isfile(dest):
+        print(f"[FAIL] {CONFIG_DEST}: missing. It lives in the F5-TTS fork repo -- "
+              f"check out the fork at the pinned commit rather than copying it in.")
         return "diverged"
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
-    shutil.copy2(src, dest)
-    print(f"[APPLIED] {CONFIG_DEST}: installed (dissertation-authored, not upstream)")
-    return "applied"
+    text = open(dest).read()
+
+    def value(key):
+        m = re.search(rf"^\s*{key}\s*:\s*([^\s#]+)", text, re.M)
+        return m.group(1) if m else None
+
+    bad = [f"{k}={value(k)!r} (expected {want!r})"
+           for k, want in PINNED_HPARAMS.items() if value(k) != want]
+    if bad:
+        print(f"[FAIL] {CONFIG_DEST}: hyperparameters do not match the pinned "
+              f"dissertation recipe -- " + "; ".join(bad))
+        print("       Fix the config in the F5-TTS fork, or update PINNED_HPARAMS "
+              "here if the recipe itself changed.")
+        return "diverged"
+    print(f"[OK]   {CONFIG_DEST}: present, hyperparameters match "
+          + ", ".join(f"{k}={v}" for k, v in PINNED_HPARAMS.items()))
+    return "already"
 
 
 def apply_patch(f5_root, patch):
@@ -162,7 +182,7 @@ def main():
     f5_root = os.path.abspath(args.f5_root)
 
     print(f"Patching F5-TTS fork at {f5_root}\n")
-    results = [install_config(f5_root)]
+    results = [verify_config(f5_root)]
     results += [apply_patch(f5_root, p) for p in PATCHES]
 
     n_diverged = results.count("diverged") + results.count("ambiguous")
