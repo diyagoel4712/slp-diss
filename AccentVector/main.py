@@ -7,7 +7,6 @@ as ``python -m accent_vector.<module>``; this just gives them one front door.
     python main.py data     prepare    --metadata ... --audio-root ... --out-dir ...
     python main.py vector   extract-lora --checkpoint ... --out ...
     python main.py infer    --pretrained ... --lora-vector ... --alphas ... --config ... --vocab ...
-    python main.py evaluate --sweep-dir ... --transcripts ... --out-csv ...
     python main.py score-sweep   --sweep-dir ... --out-csv .../rq1.csv
     python main.py score-prosody --sweep-dir ... --natural-ref ... --out-csv .../rq3.csv
 
@@ -41,7 +40,6 @@ STAGES = {
     "data": "accent_vector.data_preprocess",
     "vector": "accent_vector.extract_vector",
     "infer": "accent_vector.infer_accent",
-    "evaluate": "accent_vector.evaluate",
     "score-sweep": "accent_vector.score_sweep",
     "score-prosody": "accent_vector.score_prosody",
 }

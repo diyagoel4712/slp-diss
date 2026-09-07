@@ -11,6 +11,8 @@
 set -uo pipefail
 
 ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
+. "$(cd "$(dirname "$0")" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
+
 ACCENTS=${ACCENTS:-"dutch hindi bengali arabic"}
 REF_KINDS=${REF_KINDS:-"l1 GAE"}
 SPEAKERS=${SPEAKERS:-"m f"}
@@ -21,17 +23,6 @@ MAX_CONCURRENT=${MAX_CONCURRENT:-16}
 RESULTS_TAG=${RESULTS_TAG:-}
 
 # per-accent, per-speaker L1 reference basename (matches submit_indic_ckpt_grid.sh)
-l1base() { case "$1/$2" in
-  dutch/m)   echo data/prompts/dutch/dutch_m;;   dutch/f)   echo data/prompts/dutch/dutch_f;;
-  hindi/m)   echo data/prompts/hindi/hi_M_04;;   hindi/f)   echo data/prompts/hindi/hi_F_02;;
-  bengali/m) echo data/prompts/bengali/bn_M_01;; bengali/f) echo data/prompts/bengali/bn_F_02;;
-  # Arabic: held-out GlobalPhone speakers (must match l1base in submit_indic_ckpt_grid.sh).
-  arabic/m)  echo data/prompts/arabic/ar_M_AR010;;  arabic/f)  echo data/prompts/arabic/ar_F_AR002;;
-  # Mandarin: held-out FLEURS speakers (must match l1base in submit_indic_ckpt_grid.sh).
-  mandarin/m) echo data/prompts/mandarin/mandarin_M_824;; mandarin/f) echo data/prompts/mandarin/mandarin_F_369;;
-esac; }
-gdir() { [ "$1" = f ] && echo female || echo male; }   # speaker -> GT gender dir
-
 MANIFEST="logs/eval_tasks.$(date +%Y%m%d_%H%M%S).tsv"; : > "$MANIFEST"
 n=0 n_nogt=0
 for a in $ACCENTS; do for r in $REF_KINDS; do for s in $SPEAKERS; do

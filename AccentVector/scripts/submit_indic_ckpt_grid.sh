@@ -25,6 +25,8 @@
 set -uo pipefail
 
 ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
+. "$(cd "$(dirname "$0")" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
+
 ACCENT=${ACCENT:?set ACCENT=hindi, bengali, arabic or mandarin}
 
 # Decoupled non-Latin accents (held-out L1 prompts + SAA GT), same grid pattern.
@@ -32,20 +34,6 @@ ACCENT=${ACCENT:?set ACCENT=hindi, bengali, arabic or mandarin}
 case "$ACCENT" in hindi|bengali|arabic|mandarin) ;; *) echo "ACCENT must be hindi, bengali, arabic or mandarin (got '$ACCENT')" >&2; exit 1;; esac
 # L1 (native-language) reference basename for a given speaker (a function, not an assoc
 # array, so it runs on old bash too). Empty output => unknown; caller treats as missing.
-l1base() {
-  case "$ACCENT/$1" in
-    hindi/m)   echo data/prompts/hindi/hi_M_04;;
-    hindi/f)   echo data/prompts/hindi/hi_F_02;;
-    bengali/m) echo data/prompts/bengali/bn_M_01;;
-    bengali/f) echo data/prompts/bengali/bn_F_02;;
-    # Arabic: held-out GlobalPhone speakers (extract_gp_prompts.py); GP romanised ref-text.
-    arabic/m)  echo data/prompts/arabic/ar_M_AR010;;
-    arabic/f)  echo data/prompts/arabic/ar_F_AR002;;
-    # Mandarin: held-out FLEURS speakers (Hanzi ref-text; F5 pinyin-converts at infer).
-    mandarin/m) echo data/prompts/mandarin/mandarin_M_824;;
-    mandarin/f) echo data/prompts/mandarin/mandarin_F_369;;
-  esac
-}
 
 RUN_DIR=${RUN_DIR:?set RUN_DIR=<the ${ACCENT} training run dir with config.yaml/vocab.txt/ckpts>}
 CKPT_DIR=${CKPT_DIR:-"$RUN_DIR/ckpts/snapshots"}
@@ -60,7 +48,6 @@ SPEAKERS=${SPEAKERS:-"m f"}
 ALPHAS=${ALPHAS:-"0 0.25 0.5 0.75 1.0"}     # space-sep; passed via -v, wrapper -> commas
 SHARDS=${SHARDS:-1}
 MAX_CONCURRENT=${MAX_CONCURRENT:-8}
-NATIVE_PREFIX=${NATIVE_PREFIX:-data/prompts/GAE/gae}
 # Optional label separating this sweep -> results/<accent>/<tag>/<ref_kind>/... so cells
 # whose step_<step> dirs would otherwise clash (e.g. a hparam grid: RESULTS_TAG=lr3e5_r16)
 # stay distinct. Must be space/comma-free (rides qsub -v). Empty = old flat layout.
@@ -117,7 +104,7 @@ for step in $SELECTED; do
     name="$kind/$spk/step_$step"
     local_miss=0
     if [ "$kind" = l1 ]; then
-      base="$(l1base "$spk")"; ra="${base}.wav"; rt="${base}_ref.txt"
+      base="$(l1base "$ACCENT" "$spk")"; ra="${base}.wav"; rt="${base}_ref.txt"
     else
       ra="${NATIVE_PREFIX}_${spk}.wav"; rt="${NATIVE_PREFIX}_${spk}.txt"
     fi

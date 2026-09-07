@@ -25,6 +25,8 @@
 set -uo pipefail
 
 ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+. "$(cd "$(dirname "$0")" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
+
 cd "$ACCENT_DIR"
 mkdir -p logs
 
@@ -40,7 +42,6 @@ SPEAKERS=${SPEAKERS:-"m f"}                     # one set of tasks per speaker
 ALPHAS=${ALPHAS:-"0 0.25 0.5 0.75 1.0"}         # space-sep; passed via -v, wrapper -> commas
 SHARDS=${SHARDS:-1}                             # transcript shards per combo (>1 fans a combo across GPUs)
 MAX_CONCURRENT=${MAX_CONCURRENT:-8}             # qsub -tc: max array tasks running at once (~ GPUs used)
-NATIVE_PREFIX=${NATIVE_PREFIX:-refs/native_ga}  # neutral GA English clips: <prefix>_m.wav / _f.wav (+ .txt)
 
 run_dir_for() { case "$1" in
     hindi)   echo "$HINDI_RUN_DIR" ;;
@@ -67,7 +68,8 @@ emit() {  # accent kind speaker
   chk "$run_dir/vocab.txt"   || miss=1
   chk "vectors/$accent.pt"   || miss=1
   if [ "$kind" = l1 ]; then
-    ref_audio="data/prompts/$accent/${accent}_${spk}.wav"; ref_text="data/prompts/$accent/${accent}_${spk}_ref.txt"
+    base="$(l1base "$accent" "$spk")"
+    ref_audio="${base}.wav"; ref_text="${base}_ref.txt"
   else
     ref_audio="${NATIVE_PREFIX}_${spk}.wav"; ref_text="${NATIVE_PREFIX}_${spk}.txt"
   fi

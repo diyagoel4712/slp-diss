@@ -1,10 +1,11 @@
 #!/bin/bash
 # Eddie (SGE) GPU wrapper for scripts/infer_sweep.sh -- the alpha sweep for ONE accent.
 #   cd /exports/chss/eddie/ppls/groups/slpgpustorage/users/s2247837/slp-diss/AccentVector && mkdir -p logs
-#   qsub scripts/eddie_infer_sweep.sh
-# Override any env var at submit time, e.g.:
-#   qsub -N infer_dutch -v ACCENT_NAME=dutch,RUN_DIR=/exports/eddie/scratch/s2247837/accentvector-exps/F5TTS_v1_LoRA_dutch/2026-07-24_00-34-07 \
+# RUN_DIR and VECTOR are required; everything else has a default:
+#   qsub -N infer_dutch -v ACCENT_NAME=dutch,RUN_DIR=<run dir>,VECTOR=<run dir>/ckpts/snapshots/lora_60000.pt \
 #        scripts/eddie_infer_sweep.sh
+# For the full accent x ref_kind x speaker grid use submit_infer_sweeps.sh (array job)
+# instead; this wrapper is the single-sweep path for a one-off or a debug run.
 # The job name is static (SGE parses -N before the script runs); override it on the
 # command line to match, e.g. -N infer_dutch.
 #
@@ -40,15 +41,20 @@ ACCENT_DIR="${SGE_O_WORKDIR:-$PWD}"
 export F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}
 export ACCENT_NAME=${ACCENT_NAME:-dutch}
 # optional speaker id for multi-speaker runs (e.g. f, m). When set it (a) picks the
-# per-speaker `native` default clip refs/native_ga_<spk>.{wav,txt} and (b) nests OUT_DIR
+# per-speaker GAE default clip data/prompts/GAE/gae_<spk>.{wav,txt} and (b) nests OUT_DIR
 # one level deeper so male/female sweeps don't overwrite each other. Empty = single-speaker
 # (unchanged layout). The L1 clip is always passed explicitly, so SPEAKER doesn't default it.
 export SPEAKER=${SPEAKER:-}
-# training run dir holds config.yaml + vocab.txt (needed to rebuild the base+LoRA model).
-export RUN_DIR=${RUN_DIR:-/exports/eddie/scratch/s2247837/accentvector-exps/F5TTS_v1_LoRA_dutch/2026-07-24_00-34-07}
+# Training run dir: holds config.yaml + vocab.txt, needed to rebuild the base+LoRA
+# model with the same LoRA architecture the vector was trained with. REQUIRED -- this
+# used to default to one specific July-2026 Dutch run, which silently swept the wrong
+# checkpoint once that run was superseded.
+export RUN_DIR=${RUN_DIR:?set RUN_DIR=<training run dir> (holds config.yaml + vocab.txt)}
 export CONFIG=${CONFIG:-"$RUN_DIR/config.yaml"}
 export VOCAB=${VOCAB:-"$RUN_DIR/vocab.txt"}
-export VECTOR=${VECTOR:-"$ACCENT_DIR/vectors/${ACCENT_NAME}.pt"}
+# The LoRA accent vector: a lora_<step>.pt snapshot, or a full model_<step>.pt that
+# eddie_infer_array.sh would slice -- here, pass the vector you want swept.
+export VECTOR=${VECTOR:?set VECTOR=<lora_<step>.pt snapshot or accent vector>}
 export PRETRAIN=${PRETRAIN:-/exports/eddie/scratch/s2247837/ckpts/F5TTS_v1_Base/model_1250000.safetensors}
 export ALPHAS=${ALPHAS:-"0,0.2,0.4,0.6,0.8,1.0"}
 # qsub -v uses commas to separate variables, so a comma-separated ALPHAS value collapses

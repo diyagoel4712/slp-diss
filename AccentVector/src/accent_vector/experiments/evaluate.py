@@ -28,7 +28,7 @@ unrelated sentence, which would report a real-looking but meaningless number.
 
 Usage
 -----
-    python -m accent_vector.evaluate \
+    python -m accent_vector.experiments.evaluate \
         --sweep-dir results/per-accent/british \
         --transcripts data/transcripts/eval_transcripts.txt \
         --ref-wav refs/england.wav \
@@ -44,7 +44,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[3]
+REPO = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(REPO / "Evaluation"))
 
 def alpha_dirs(sweep_dir):

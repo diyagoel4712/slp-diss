@@ -12,6 +12,9 @@ but produced no output in this checkout: none of ``temporal.csv``,
 ``gram.csv`` or ``aggregate.csv`` exists anywhere under AccentVector/. They are
 kept because the questions are still open, not because they are wired up.
 
+    evaluate.py         whole-sweep scorer writing ONE metrics.csv -- superseded by
+                        score_sweep / score_prosody, which write the rq1.csv /
+                        rq3.csv the eval array and the notebook actually use
     aggregate.py        pool per-speaker metric CSVs into a cross-speaker summary
     rq2_behavioural.py  output metrics at matched alpha across checkpoints. Its
                         inputs (per-step rq1.csv) now EXIST, so this is the one

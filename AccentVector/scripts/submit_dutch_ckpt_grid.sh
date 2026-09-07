@@ -22,6 +22,8 @@
 set -uo pipefail
 
 ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
+. "$(cd "$(dirname "$0")" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
+
 ACCENT=dutch
 
 RUN_DIR=${RUN_DIR:-/exports/eddie/scratch/s2247837/accentvector-exps/F5TTS_v1_LoRA_dutch/2026-07-24_00-34-07}
@@ -37,7 +39,6 @@ SPEAKERS=${SPEAKERS:-"m f"}
 ALPHAS=${ALPHAS:-"0 0.25 0.5 0.75 1.0"}     # space-sep; passed via -v, wrapper -> commas
 SHARDS=${SHARDS:-1}
 MAX_CONCURRENT=${MAX_CONCURRENT:-8}
-NATIVE_PREFIX=${NATIVE_PREFIX:-data/prompts/GAE/gae}
 # Optional label separating this sweep -> results/<accent>/<tag>/<ref_kind>/... so cells
 # whose step_<step> dirs would otherwise clash (e.g. a hparam grid: RESULTS_TAG=lr3e5_r16)
 # stay distinct. Must be space/comma-free (rides qsub -v). Empty = old flat layout.
@@ -91,7 +92,7 @@ for step in $SELECTED; do
     name="$kind/$spk/step_$step"
     local_miss=0
     if [ "$kind" = l1 ]; then
-      ra="data/prompts/dutch/dutch_${spk}.wav"; rt="data/prompts/dutch/dutch_${spk}_ref.txt"
+      base="$(l1base "$ACCENT" "$spk")"; ra="${base}.wav"; rt="${base}_ref.txt"
     else
       ra="${NATIVE_PREFIX}_${spk}.wav"; rt="${NATIVE_PREFIX}_${spk}.txt"
     fi

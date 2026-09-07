@@ -170,7 +170,6 @@ src/accent_vector/       the importable package -- src layout, so PYTHONPATH=src
   score_sweep.py         -> rq1.csv: accent, identity, WER, P(English), onsets
   score_prosody.py       -> rq3.csv: segmental (PPG-KL) + suprasegmental
   shared.py              eval-suite bridge, sweep IO, geometry, threshold onset
-  evaluate.py            scores a sweep via the Evaluation/ suite
   sample_checkpoints.py  synthesise a fixed prompt at every LoRA snapshot
   experiments/           unfinished analyses, kept for the write-up (see its
                          __init__.py: none of them has produced output)
