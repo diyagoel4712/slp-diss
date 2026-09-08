@@ -1,11 +1,11 @@
 #!/bin/bash
-# Prepare the neutral-English `native` reference clips (the decoupling control) from VCTK.
+# Prepare the GAE reference clips from VCTK.
 # Default: male p360_011, female p361_011 (both American / New Jersey per speaker-info.txt),
 # mic1 -> data/prompts/GAE/gae_{m,f}.{wav,txt} (mono, 24 kHz, 16-bit PCM + one-line transcript).
 #
-# VCTK is ENGLISH, so these serve REF_KIND=native ONLY; the `l1` condition still needs
+# VCTK is ENGLISH, so these serve REF_KIND=GAE ONLY; the `l1` condition still needs
 # native-LANGUAGE clips (Dutch/Hindi/Bengali). To use these in the sweep, point the submitter
-# at them:  NATIVE_PREFIX=data/prompts/GAE/gae bash scripts/submit_infer_sweeps.sh
+# at them: NATIVE_PREFIX=data/prompts/GAE/gae bash scripts/submit_infer_sweeps.sh
 #
 # Run on a login node with ffmpeg (module load ffmpeg / a conda env that has it):
 #   bash scripts/prep_native_refs.sh
@@ -36,7 +36,7 @@ prep() {  # speaker_id  tag(m|f)
   printf '  %s_%-2s <- %s_%s_%s   text: %s\n' "$PREFIX" "$tag" "$spk" "$UTT" "$MIC" "$(cat "$OUT_DIR/${PREFIX}_${tag}.txt")"
 }
 
-echo "VCTK -> neutral-English native refs (mic=$MIC, sr=$SR Hz) in $OUT_DIR:"
+echo "VCTK -> GAE refs (mic=$MIC, sr=$SR Hz) in $OUT_DIR:"
 prep "$MALE" m
 prep "$FEMALE" f
 echo "done. Use with: NATIVE_PREFIX=${OUT_DIR#$ACCENT_DIR/}/$PREFIX bash scripts/submit_infer_sweeps.sh"
