@@ -1,12 +1,12 @@
 #!/bin/bash
-# Eddie (SGE) GPU wrapper for scripts/finetune_lora.sh -- LoRA fine-tune one accent.
+# Eddie (SGE) GPU wrapper for scripts/finetune/finetune.sh -- LoRA fine-tune one accent.
 #   cd /exports/chss/eddie/ppls/groups/slpgpustorage/users/s2247837/slp-diss/AccentVector && mkdir -p logs
-#   qsub scripts/eddie_finetune_lora.sh
+#   qsub scripts/finetune/finetune_wrapper_eddie.sh
 # Override any env var at submit time, e.g.:
-#   qsub -v ACCENT_NAME=dutch scripts/eddie_finetune_lora.sh
+#   qsub -v ACCENT_NAME=dutch scripts/finetune/finetune_wrapper_eddie.sh
 # The job name is static (SGE parses -N before the script runs, so it can't read
 # ACCENT_NAME); override it on the command line to match, e.g.:
-#   qsub -N ft_dutch -v ACCENT_NAME=dutch scripts/eddie_finetune_lora.sh
+#   qsub -N ft_dutch -v ACCENT_NAME=dutch scripts/finetune/finetune_wrapper_eddie.sh
 #
 #$ -N ft_accent
 #$ -cwd
@@ -67,16 +67,16 @@ python -c "import torch; print('torch', torch.__version__, 'cuda', torch.version
 
 # record run provenance (code versions + config) -> log + CKPT_ROOT/provenance/.
 # Best-effort: a provenance hiccup must never kill the GPU job.
-bash "$ACCENT_DIR/scripts/record_provenance.sh" "$ACCENT_DIR" "$F5_ROOT" "$CKPT_ROOT/provenance" \
+bash "$ACCENT_DIR/scripts/lib/record_provenance.sh" "$ACCENT_DIR" "$F5_ROOT" "$CKPT_ROOT/provenance" \
     || echo "warning: provenance capture failed (continuing)"
 
 # builds data/<accent>_pinyin (prepare) if needed, then LoRA fine-tunes.
 # Extra args are forwarded to finetune_cli.py as Hydra overrides.
-# Any script args ("$@", passed after the script name in `qsub ... eddie_finetune_lora.sh
+# Any script args ("$@", passed after the script name in `qsub ... finetune_wrapper_eddie.sh
 # KEY=VAL ...`) are appended last so they override the defaults above -- e.g. to RESUME
 # an interrupted run, pin ckpts.save_dir to the existing run dir (holding ckpts/model_last.pt)
 # and raise optim.epochs so the LR-decay horizon reaches the target step count.
-bash "$ACCENT_DIR/scripts/finetune_lora.sh" \
+bash "$ACCENT_DIR/scripts/finetune/finetune.sh" \
     ckpts.logger="$LOGGER" \
     datasets.num_workers="$NUM_WORKERS" \
     model.vocoder.is_local=True \

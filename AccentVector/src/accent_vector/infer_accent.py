@@ -9,7 +9,7 @@ alone, no fine-tuning) and **alpha=1 = theta_ft** (the fully fine-tuned model, f
 accent-vector impact).
 
 The reference *kind* is itself a deliberately-varied experimental condition compared
-*across* sweeps (see scripts/eddie_infer_sweep.sh REF_KIND). It is NOT a fixed invariant:
+*across* sweeps (see scripts/infer/eddie_infer_sweep.sh REF_KIND). It is NOT a fixed invariant:
 
 * **L1 reference** (target accent's native-language clip; paper-faithful cloning, see
   ADAPTATION_PLAN.md gotcha #3). Because F5-TTS has no language-ID token or

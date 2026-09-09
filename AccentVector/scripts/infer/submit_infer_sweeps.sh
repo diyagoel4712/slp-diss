@@ -12,11 +12,11 @@
 # each task still builds the model ONCE (build-once is preserved; only the sweep splits).
 #
 # Runs on a LOGIN node: builds a manifest (logs/infer_tasks.<ts>.tsv), then
-#   qsub -t 1-N -tc <MAX_CONCURRENT> -v ALPHAS="..." scripts/eddie_infer_array.sh <manifest>
+#   qsub -t 1-N -tc <MAX_CONCURRENT> -v ALPHAS="..." scripts/infer/eddie_infer_array.sh <manifest>
 # One submission; one `qdel <jobid>` cancels the whole grid.
 #
-#   bash scripts/submit_infer_sweeps.sh
-#   DRY_RUN=1 bash scripts/submit_infer_sweeps.sh            # build+print manifest & qsub line, submit nothing
+#   bash scripts/infer/submit_infer_sweeps.sh
+#   DRY_RUN=1 bash scripts/infer/submit_infer_sweeps.sh            # build+print manifest & qsub line, submit nothing
 #   SHARDS=4 MAX_CONCURRENT=12 bash scripts/...              # 4-way transcript split, up to 12 GPUs at once
 #   ACCENTS="dutch" REF_KINDS="GAE" SPEAKERS="f" bash ... # a subset
 #   HINDI_RUN_DIR=... BENGALI_RUN_DIR=... bash scripts/...   # point at your finetune run dirs
@@ -24,8 +24,8 @@
 # A local pre-flight OMITS (doesn't enqueue) any combo whose assets are missing.
 set -uo pipefail
 
-ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-. "$(cd "$(dirname "$0")" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
+ACCENT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+. "$(cd "$(dirname "$0")/../lib" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
 
 cd "$ACCENT_DIR"
 mkdir -p logs
@@ -96,7 +96,7 @@ if [ "$N" -eq 0 ]; then
   echo "no runnable tasks (all assets missing); prepare them and re-run." >&2; rm -f "$MANIFEST"; exit 1
 fi
 
-QSUB=(qsub -t "1-$N" -tc "$MAX_CONCURRENT" -v "ALPHAS=$ALPHAS" scripts/eddie_infer_array.sh "$ACCENT_DIR/$MANIFEST")
+QSUB=(qsub -t "1-$N" -tc "$MAX_CONCURRENT" -v "ALPHAS=$ALPHAS" scripts/infer/eddie_infer_array.sh "$ACCENT_DIR/$MANIFEST")
 if [ "${DRY_RUN:-0}" = 1 ]; then
   echo "--- manifest rows ---"; cat "$MANIFEST"
   echo "--- would submit ---"; printf '  %q ' "${QSUB[@]}"; printf '\n'

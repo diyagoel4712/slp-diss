@@ -3,7 +3,7 @@
 
 Two sources, same table:
 
-  --provenance  (best) $CKPT_ROOT/provenance, where eddie_finetune_lora.sh records
+  --provenance  (best) $CKPT_ROOT/provenance, where finetune_wrapper_eddie.sh records
            the accent + METADATA_CSV + AUDIO_ROOT of every job it ran. Each language
            is fine-tuned from a DIFFERENTLY NAMED csv -- Dutch/Mandarin/Arabic from
            metadata.dnsmos.csv, Hindi/Bengali from metadata.roman.csv -- so this is
@@ -23,12 +23,12 @@ Two sources, same table:
            these to double-check the above: they additionally exclude the handful of
            rows prepare drops for missing/unreadable audio.
 
-    python scripts/dataset_stats.py --provenance $CKPT_ROOT/provenance
-    python scripts/dataset_stats.py --clips /exports/eddie/scratch/s2247837/data/*_clips
-    python scripts/dataset_stats.py --clips hindi=/path/iv_hindi_clips \
+    python -m accent_vector.dataset_stats --provenance $CKPT_ROOT/provenance
+    python -m accent_vector.dataset_stats --clips /exports/eddie/scratch/s2247837/data/*_clips
+    python -m accent_vector.dataset_stats --clips hindi=/path/iv_hindi_clips \
         --manifest hindi=/path/iv_hindi_clips/metadata.roman.csv
-    python scripts/dataset_stats.py --provenance $CKPT_ROOT/provenance --steps dutch=60000
-    python scripts/dataset_stats.py --data-root $F5_ROOT/data
+    python -m accent_vector.dataset_stats --provenance $CKPT_ROOT/provenance --steps dutch=60000
+    python -m accent_vector.dataset_stats --data-root $F5_ROOT/data
 
 The `manifest` column always reports which csv each row was counted from.
 
@@ -143,7 +143,7 @@ def from_clips(clips_dir, manifest=None, accent=None):
 def read_provenance(prov_dir):
     """{accent: (metadata_csv, clips_dir)} from record_provenance.sh output.
 
-    eddie_finetune_lora.sh writes one ft.<job>.<stamp>.txt per run under
+    finetune_wrapper_eddie.sh writes one ft.<job>.<stamp>.txt per run under
     $CKPT_ROOT/provenance/, holding the exact accent= / METADATA_CSV= / AUDIO_ROOT=
     the job ran with. Newest file per accent wins; conflicts are reported.
     """

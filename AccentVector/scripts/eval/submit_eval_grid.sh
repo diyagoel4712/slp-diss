@@ -1,17 +1,17 @@
 #!/bin/bash
 # Build the eval manifest over EXISTING sweep dirs and submit the CPU array
-# (scripts/eddie_eval_array.sh). One task per
+# (scripts/eval/eddie_eval_array.sh). One task per
 # results/<accent>[/<tag>]/<ref_kind>/<speaker>/audio/step_*/ ; the array writes the
 # CSVs to the sibling metrics/ tree (.../metrics/step_*/).
 #
-#   bash scripts/submit_eval_grid.sh                       # full grid, all accents/steps
-#   STEP_SCOPE=final bash scripts/submit_eval_grid.sh      # only the final checkpoint per cell
-#   ACCENTS="dutch" REF_KINDS="GAE" bash scripts/submit_eval_grid.sh
-#   DRY_RUN=1 bash scripts/submit_eval_grid.sh             # print manifest + qsub line, don't submit
+#   bash scripts/eval/submit_eval_grid.sh                       # full grid, all accents/steps
+#   STEP_SCOPE=final bash scripts/eval/submit_eval_grid.sh      # only the final checkpoint per cell
+#   ACCENTS="dutch" REF_KINDS="GAE" bash scripts/eval/submit_eval_grid.sh
+#   DRY_RUN=1 bash scripts/eval/submit_eval_grid.sh             # print manifest + qsub line, don't submit
 set -uo pipefail
 
-ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
-. "$(cd "$(dirname "$0")" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
+ACCENT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
+. "$(cd "$(dirname "$0")/../lib" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
 
 ACCENTS=${ACCENTS:-"dutch hindi bengali arabic"}
 REF_KINDS=${REF_KINDS:-"l1 GAE"}
@@ -49,7 +49,7 @@ N=$(wc -l < "$MANIFEST" | tr -d ' ')
 echo "manifest: $MANIFEST  ($N tasks; $n_nogt with no GT dir -> cs_accent+rq3 skipped there)"
 [ "$N" -gt 0 ] || { echo "no runnable sweeps found." >&2; rm -f "$MANIFEST"; exit 1; }
 
-QSUB=(qsub -t "1-$N" -tc "$MAX_CONCURRENT" scripts/eddie_eval_array.sh "$ACCENT_DIR/$MANIFEST")
+QSUB=(qsub -t "1-$N" -tc "$MAX_CONCURRENT" scripts/eval/eddie_eval_array.sh "$ACCENT_DIR/$MANIFEST")
 if [ "${DRY_RUN:-0}" = 1 ]; then
   echo "--- manifest ---"; cat "$MANIFEST"
   echo "--- would submit ---"; printf '  %q ' "${QSUB[@]}"; printf '\n'

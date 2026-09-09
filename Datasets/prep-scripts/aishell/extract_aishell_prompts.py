@@ -11,7 +11,7 @@ speaker in [--min-dur,--max-dur] (nearest --target) + its .txt, into --out:
 HELD-OUT CAVEAT: prep_aishell_from_zips.py consumes a balanced speaker set, so these are only
 truly held out if you EXCLUDE them from training and retrain:
     prep_aishell_from_zips.py --exclude-speakers <ids printed below> ...
-Then set l1base() mandarin/m|f in AccentVector/scripts/submit_indic_ckpt_grid.sh to the
+Then set l1base() mandarin/m|f in AccentVector/scripts/infer/submit_indic_ckpt_grid.sh to the
 mandarin_<M|F>_<spk> basenames.
 
   python extract_aishell_prompts.py --root <aishell1_src> \

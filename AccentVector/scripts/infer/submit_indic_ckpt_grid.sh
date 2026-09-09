@@ -17,15 +17,15 @@
 #   (data/transcripts/<accent>/<accent>_{m,f}_eval.txt), matching the SAA ground truth.
 #
 # Point RUN_DIR at the accent's training run dir (has config.yaml, vocab.txt, ckpts/snapshots):
-#   ACCENT=hindi   RUN_DIR=/exports/.../F5TTS_v1_LoRA_hindi/<ts>   bash scripts/submit_indic_ckpt_grid.sh
-#   ACCENT=bengali RUN_DIR=/exports/.../F5TTS_v1_LoRA_bengali/<ts> bash scripts/submit_indic_ckpt_grid.sh
-#   ACCENT=arabic  RUN_DIR=/exports/.../F5TTS_v1_LoRA_arabic/<ts>  bash scripts/submit_indic_ckpt_grid.sh
+#   ACCENT=hindi   RUN_DIR=/exports/.../F5TTS_v1_LoRA_hindi/<ts>   bash scripts/infer/submit_indic_ckpt_grid.sh
+#   ACCENT=bengali RUN_DIR=/exports/.../F5TTS_v1_LoRA_bengali/<ts> bash scripts/infer/submit_indic_ckpt_grid.sh
+#   ACCENT=arabic  RUN_DIR=/exports/.../F5TTS_v1_LoRA_arabic/<ts>  bash scripts/infer/submit_indic_ckpt_grid.sh
 #   DRY_RUN=1 ...   (print the manifest, don't submit)
 #   STEP_INTERVAL=5000 SHARDS=2 MAX_CONCURRENT=12 ...   (STEP_INTERVAL=0 N_CHECKPOINTS=8 = even-spacing)
 set -uo pipefail
 
-ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
-. "$(cd "$(dirname "$0")" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
+ACCENT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
+. "$(cd "$(dirname "$0")/../lib" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
 
 ACCENT=${ACCENT:?set ACCENT=hindi, bengali, arabic or mandarin}
 
@@ -127,7 +127,7 @@ echo "manifest: $MANIFEST  ($n_combos combos x $SHARDS shard(s) = $N tasks; $n_s
 
 QSUB=(qsub -t "1-$N" -tc "$MAX_CONCURRENT" -v "ALPHAS=$ALPHAS")
 [ -n "$RESULTS_TAG" ] && QSUB+=(-v "RESULTS_TAG=$RESULTS_TAG")
-QSUB+=(scripts/eddie_infer_array.sh "$ACCENT_DIR/$MANIFEST")
+QSUB+=(scripts/infer/eddie_infer_array.sh "$ACCENT_DIR/$MANIFEST")
 if [ "${DRY_RUN:-0}" = 1 ]; then
   echo "--- manifest rows ---"; cat "$MANIFEST"
   echo "--- would submit ---"; printf '  %q ' "${QSUB[@]}"; printf '\n'

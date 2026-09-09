@@ -7,7 +7,7 @@
 #   METADATA_CSV=/path/to/british.csv AUDIO_ROOT=/path/to/audio \
 #   PRETRAIN=$F5_ROOT/ckpts/F5TTS_v1_Base/model_1250000.pt \
 #   CKPT_ROOT=exps \
-#   bash scripts/finetune_lora.sh
+#   bash scripts/finetune/finetune.sh
 #
 # Stop cleanly when the samples sound right:  touch <save_dir>/STOP
 # (save_dir is printed at launch; it finishes the step, writes model_last.pt, exits.)
@@ -23,7 +23,7 @@ set -euo pipefail
 
 export CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-0}
 
-ACCENT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+ACCENT_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}
 export PYTHONPATH="$F5_ROOT/src:$ACCENT_DIR/src:${PYTHONPATH:-}"
 

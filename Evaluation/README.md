@@ -41,7 +41,7 @@ other metrics. `evaluation_functions.py` runs in **`.conda`** and calls the
 `_GENAID_PYTHON` in `evaluation_functions.py` hardcodes the genaid interpreter path
 — update it if your conda prefix differs (or set `GENAID_PYTHON` / `GENAID_DIR`).
 
-On Eddie, both envs are built by `AccentVector/scripts/eddie_eval_setup.sh`, which
+On Eddie, both envs are built by `AccentVector/scripts/eval/eddie_eval_setup.sh`, which
 installs from the two requirements files here and copies the wrappers into the GenAID
 clone. That script is the authoritative version of the setup below.
 
@@ -112,7 +112,7 @@ these edits:
    False, checkpoint_filename, is_local` (assume HF format). Old SpeechBrain hits the Hub
    just to classify the XLSR backbone even when it's cached, so `HF_HUB_OFFLINE=1` makes it
    a hard error on internet-less compute nodes. Applied automatically by
-   `AccentVector/scripts/eddie_eval_setup.sh` (patch #4).
+   `AccentVector/scripts/eval/eddie_eval_setup.sh` (patch #4).
 
 Also note `predict_GenAID.py` passes `device` to `pretrainer.load_collected(device=...)`
 (checkpoint was saved on CUDA) and includes the unused speaker-adversarial head so the

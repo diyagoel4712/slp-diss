@@ -12,10 +12,10 @@ as ``python -m accent_vector.<module>``; this just gives them one front door.
 
 ``score-sweep`` and ``score-prosody`` write the rq1.csv / rq3.csv that
 ``notebooks/dissertation_figures.ipynb`` turns into every figure; on Eddie they
-are driven by scripts/eddie_eval_array.sh rather than through this dispatcher.
+are driven by scripts/eval/eddie_eval_array.sh rather than through this dispatcher.
 
 Fine-tuning itself is not wrapped here -- it runs through F5-TTS's own
-``finetune_cli.py`` (see scripts/finetune_lora.sh). Fine-tuning is always LoRA:
+``finetune_cli.py`` (see scripts/finetune/finetune.sh). Fine-tuning is always LoRA:
 the accent vector IS the LoRA branch (paper Eq. 3), and rank / lr / steps are set in
 the fork's ``F5TTS_v1_LoRA_accent.yaml`` or overridden per run on the Hydra CLI.
 

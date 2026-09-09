@@ -15,7 +15,7 @@ HELD-OUT CAVEAT: prep_globalphone_f5.py consumes ALL speakers, so a prompt speak
 truly held out if you also EXCLUDE it from the training metadata and retrain:
     prep_globalphone_f5.py --exclude-speakers <ids printed below> ...
 (natural to do when moving Arabic to the paper-faithful hparams). Then update l1base() in
-AccentVector/scripts/submit_indic_ckpt_grid.sh to the ar_<M|F>_<spk> basenames.
+AccentVector/scripts/infer/submit_indic_ckpt_grid.sh to the ar_<M|F>_<spk> basenames.
 
   python extract_gp_prompts.py --root <gp_arabic> \
       --out ../../../AccentVector/data/prompts/arabic \

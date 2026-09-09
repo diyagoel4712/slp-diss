@@ -2,7 +2,7 @@
 # Eddie (SGE) CPU ARRAY: score ONE alpha-sweep dir per task with the RQ eval suite --
 # rq1 (accent_cs / speaker_sim / WER / LID) + rq3 (segmental/suprasegmental).
 # No GPU. Models are pre-staged by eddie_eval_setup.sh; jobs run offline.
-# Submit via scripts/submit_eval_grid.sh (builds the manifest and runs qsub -t 1-N ...).
+# Submit via scripts/eval/submit_eval_grid.sh (builds the manifest and runs qsub -t 1-N ...).
 #
 #$ -N eval_array
 #$ -cwd

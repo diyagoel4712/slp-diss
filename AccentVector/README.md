@@ -39,10 +39,10 @@ The paper uses XTTS-v2; we use F5-TTS. Two consequences:
    and can be overridden per run on the Hydra CLI, e.g.
 
    ```bash
-   qsub scripts/eddie_finetune_lora.sh model.arch.lora_rank=32 optim.learning_rate=1e-4
+   qsub scripts/finetune/finetune_wrapper_eddie.sh model.arch.lora_rank=32 optim.learning_rate=1e-4
    ```
 
-   `scripts/patch_f5_tts_fork.py` warns when the installed config differs from the
+   `scripts/lib/patch_f5_tts_fork.py` warns when the installed config differs from the
    recipe the write-up reports, so a sweep is never mistaken for the headline run.
 
    > A LoRA snapshot's delta lives in adapter keys that are absent from the base
@@ -99,13 +99,13 @@ Every stage puts `$F5_ROOT/src` and this package on `PYTHONPATH` for you.
 python main.py data prepare --metadata data/finetuning_data/dutch/metadata.csv \
     --audio-root /path/to/clips --out-dir $F5_ROOT/data/dutch_pinyin
 
-# 2. LoRA fine-tune -> lora_<step>.pt snapshots  (GPU; Eddie: qsub eddie_finetune_lora.sh)
-ACCENT_NAME=dutch bash scripts/finetune_lora.sh
+# 2. LoRA fine-tune -> lora_<step>.pt snapshots  (GPU; Eddie: qsub finetune_wrapper_eddie.sh)
+ACCENT_NAME=dutch bash scripts/finetune/finetune.sh
 
 # 3. Alpha sweep over held-out English transcripts, fixed L1 reference  (GPU)
 #    alpha=0 = base model cloning the reference; alpha=1 = the trained LoRA strength
 VECTOR=<run>/ckpts/snapshots/lora_60000.pt CONFIG=<run>/config.yaml VOCAB=<run>/vocab.txt \
-  REF_AUDIO=data/prompts/dutch/dutch_f.wav bash scripts/infer_sweep.sh
+  REF_AUDIO=data/prompts/dutch/dutch_f.wav bash scripts/infer/infer_sweep.sh
 
 # 4. Score the sweep -> rq1.csv / rq3.csv  (Mac; Eddie: submit_eval_grid.sh)
 python -m accent_vector.score_sweep --sweep-dir <sweep> --lid --out-csv <sweep>/rq1.csv
@@ -151,7 +151,7 @@ merge.
   the target-accent clips for `cs_accent`/PPG-KL/F0, same speaker for both. Code-switching
   data works but must be segmented into clean L1 vs English spans. Keep test speakers
   **disjoint** from the fine-tuning set.
-- **Several speakers per accent:** the submit scripts (`scripts/submit_<accent>_ckpt_grid.sh`)
+- **Several speakers per accent:** the submit scripts (`scripts/infer/submit_<accent>_ckpt_grid.sh`)
   sweep each speaker into `results/per-accent/<accent>/<tag>/<ref_kind>/<speaker>/`. Score each
   with `score_sweep` / `score_prosody`; the figures notebook pools the m/f speakers per accent.
 - **Non-Latin transcripts:** the F5 base vocab covers Latin + pinyin only, so Hindi/Arabic/
@@ -194,8 +194,8 @@ are git-ignored, as is `data/` apart from the eval assets re-included in
 ```bash
 # after A0 produces the LoRA snapshots: submit the checkpoint x alpha grid.
 # (accent_vector.experiments.grid was the standalone driver for this and is gone;
-#  the Eddie array does the job -- see scripts/submit_<accent>_ckpt_grid.sh)
-bash scripts/submit_dutch_ckpt_grid.sh      # A1 -> results/per-accent/<accent>/<ref>/<spk>/audio/step_<n>/alpha_<a>/
+#  the Eddie array does the job -- see scripts/infer/submit_<accent>_ckpt_grid.sh)
+bash scripts/infer/submit_dutch_ckpt_grid.sh      # A1 -> results/per-accent/<accent>/<ref>/<spk>/audio/step_<n>/alpha_<a>/
 
 # Core scoring: score each speaker with ITS own L1 reference + natural clips, then pool
 for s in results/per-accent/indian/*/; do sp=$(basename "$s")
@@ -246,7 +246,7 @@ each checkpoint's sweep, score each, then collate at matched α — ideally agai
 
 ```bash
 # GPU: alpha sweep at several checkpoints -> results/per-accent/dutch/GAE/by_step/step_<step>/
-STEP_INTERVAL=5000 REF_KINDS=GAE bash scripts/submit_dutch_ckpt_grid.sh
+STEP_INTERVAL=5000 REF_KINDS=GAE bash scripts/infer/submit_dutch_ckpt_grid.sh
 
 # CPU: score each checkpoint, then compare matched-alpha across training
 for s in results/per-accent/dutch/GAE/by_step/step_*/; do

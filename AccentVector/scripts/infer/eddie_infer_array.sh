@@ -2,9 +2,9 @@
 # Eddie (SGE) ARRAY wrapper for the accent alpha-sweep -- one array TASK per
 # (accent x ref_kind x speaker x transcript-shard) row of a manifest, so the whole
 # 3-accent x 2-ref x 2-speaker inference fans out across as many GPUs as the queue
-# grants (capped by qsub -tc). Submit via scripts/submit_infer_sweeps.sh, which builds
+# grants (capped by qsub -tc). Submit via scripts/infer/submit_infer_sweeps.sh, which builds
 # the manifest and runs:
-#   qsub -t 1-<N> -tc <MAX> -v ALPHAS="0 0.25 ..." scripts/eddie_infer_array.sh <manifest.tsv>
+#   qsub -t 1-<N> -tc <MAX> -v ALPHAS="0 0.25 ..." scripts/infer/eddie_infer_array.sh <manifest.tsv>
 #
 # Each task is an INDEPENDENT SGE job (its own GPU allocation + cgroup isolation), so
 # CUDA_VISIBLE_DEVICES=0 inside infer_sweep.sh is correct here exactly as for a single job.
@@ -97,8 +97,8 @@ for f in "$VECTOR" "$CONFIG" "$VOCAB" "$REF_AUDIO"; do
 done
 
 # per-task provenance dir (unique -> no cross-task clobber when shards share an OUT_DIR).
-bash "$ACCENT_DIR/scripts/record_provenance.sh" "$ACCENT_DIR" "$F5_ROOT" \
+bash "$ACCENT_DIR/scripts/lib/record_provenance.sh" "$ACCENT_DIR" "$F5_ROOT" \
     "$OUT_DIR/provenance/task_${JOB_ID}_${SGE_TASK_ID}" \
     || echo "warning: provenance capture failed (continuing)"
 
-bash "$ACCENT_DIR/scripts/infer_sweep.sh"
+bash "$ACCENT_DIR/scripts/infer/infer_sweep.sh"

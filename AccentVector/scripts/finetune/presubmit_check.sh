@@ -1,12 +1,12 @@
 #!/bin/bash
-# Pre-submit sanity check for eddie_finetune_lora.sh. Run on a LOGIN NODE in the
+# Pre-submit sanity check for finetune_wrapper_eddie.sh. Run on a LOGIN NODE in the
 # f5-tts env BEFORE qsub, so missing files/imports fail here (seconds) instead of
 # after the GPU job queues and starts.
-#   conda activate f5-tts && bash scripts/presubmit_check.sh
-# Uses the SAME env-var defaults as eddie_finetune_lora.sh; override to match.
+#   conda activate f5-tts && bash scripts/finetune/presubmit_check.sh
+# Uses the SAME env-var defaults as finetune_wrapper_eddie.sh; override to match.
 set -uo pipefail
 
-ACCENT_DIR=$(cd "$(dirname "$0")/.." && pwd)
+ACCENT_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 F5_ROOT=${F5_ROOT:-"$ACCENT_DIR/../F5-TTS"}
 ACCENT_NAME=${ACCENT_NAME:-dutch}
 METADATA_CSV=${METADATA_CSV:-/exports/eddie/scratch/s2247837/data/cgn_dutch_clips/metadata.dnsmos.csv}
@@ -27,7 +27,7 @@ chk_file "$PRETRAIN"                           "base checkpoint"
 chk_file "$F5_VOCAB"                           "base vocab (F5_VOCAB)"
 chk_file "$F5_ROOT/src/f5_tts/configs/F5TTS_v1_LoRA_accent.yaml" "LoRA config yaml (the one Hydra loads)"
 # the config is the fork's; verify its pinned hyperparameters rather than just its existence
-if python "$ACCENT_DIR/scripts/patch_f5_tts_fork.py" --f5-root "$F5_ROOT" 2>/dev/null \
+if python "$ACCENT_DIR/scripts/lib/patch_f5_tts_fork.py" --f5-root "$F5_ROOT" 2>/dev/null \
      | grep -q "^\[FAIL\].*configs/F5TTS_v1_LoRA_accent.yaml"; then
     bad "LoRA config hyperparameters drifted from the pinned recipe (run patch_f5_tts_fork.py to see)"
 else
@@ -71,7 +71,7 @@ then :; else fail=1; fi
 
 echo
 if [ "$fail" -eq 0 ]; then
-    printf '\033[32mALL CHECKS PASSED\033[0m -- safe to: qsub scripts/eddie_finetune_lora.sh\n'
+    printf '\033[32mALL CHECKS PASSED\033[0m -- safe to: qsub scripts/finetune/finetune_wrapper_eddie.sh\n'
 else
     printf '\033[31mSOME CHECKS FAILED\033[0m -- fix the above before qsub.\n'; exit 1
 fi

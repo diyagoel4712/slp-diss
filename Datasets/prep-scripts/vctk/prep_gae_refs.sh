@@ -5,15 +5,16 @@
 #
 # VCTK is ENGLISH, so these serve REF_KIND=GAE ONLY; the `l1` condition still needs
 # native-LANGUAGE clips (Dutch/Hindi/Bengali). To use these in the sweep, point the submitter
-# at them: NATIVE_PREFIX=data/prompts/GAE/gae bash scripts/submit_infer_sweeps.sh
+# at them: NATIVE_PREFIX=data/prompts/GAE/gae bash scripts/infer/submit_infer_sweeps.sh
 #
 # Run on a login node with ffmpeg (module load ffmpeg / a conda env that has it):
-#   bash scripts/prep_native_refs.sh
-#   MALE=p294 FEMALE=p334 PREFIX=gae2 bash scripts/prep_native_refs.sh   # other speakers
+#   bash Datasets/prep-scripts/vctk/prep_gae_refs.sh
+#   MALE=p294 FEMALE=p334 PREFIX=gae2 bash Datasets/prep-scripts/vctk/prep_gae_refs.sh   # other speakers
 set -euo pipefail
 
-ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-VCTK_ROOT=${VCTK_ROOT:-"$ACCENT_DIR/../Datasets/vctk/VCTK-Corpus-0.92"}
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"   # this script lives at Datasets/prep-scripts/vctk/
+ACCENT_DIR="$REPO_ROOT/AccentVector"                  # outputs land in the AccentVector prompt tree
+VCTK_ROOT=${VCTK_ROOT:-"$REPO_ROOT/Datasets/vctk/VCTK-Corpus-0.92"}
 OUT_DIR=${OUT_DIR:-"$ACCENT_DIR/data/prompts/GAE"}
 PREFIX=${PREFIX:-gae}    # output basenames <PREFIX>_m / <PREFIX>_f (submitter: NATIVE_PREFIX=<out>/<PREFIX>)
 MALE=${MALE:-p360}       # American male   (New Jersey)
@@ -39,4 +40,4 @@ prep() {  # speaker_id  tag(m|f)
 echo "VCTK -> GAE refs (mic=$MIC, sr=$SR Hz) in $OUT_DIR:"
 prep "$MALE" m
 prep "$FEMALE" f
-echo "done. Use with: NATIVE_PREFIX=${OUT_DIR#$ACCENT_DIR/}/$PREFIX bash scripts/submit_infer_sweeps.sh"
+echo "done. Use with: NATIVE_PREFIX=${OUT_DIR#$ACCENT_DIR/}/$PREFIX bash scripts/infer/submit_infer_sweeps.sh"

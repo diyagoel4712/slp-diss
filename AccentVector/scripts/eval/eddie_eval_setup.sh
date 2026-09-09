@@ -8,13 +8,13 @@
 #   slp-eval  (py3.11)  WER/PPG-KL/F0/MCD           -> requirements-eval.txt
 #   genaid    (py3.10)  cs_accent / speaker-sim / LID (SpeechBrain fork, editable)
 #
-#   bash scripts/eddie_eval_setup.sh            # build everything
-#   STEP=envs   bash scripts/eddie_eval_setup.sh   # just the conda envs
-#   STEP=genaid bash scripts/eddie_eval_setup.sh   # just clone+patch+checkpoint GenAID
-#   STEP=warm   bash scripts/eddie_eval_setup.sh   # download/cache all models (see note)
+#   bash scripts/eval/eddie_eval_setup.sh            # build everything
+#   STEP=envs   bash scripts/eval/eddie_eval_setup.sh   # just the conda envs
+#   STEP=genaid bash scripts/eval/eddie_eval_setup.sh   # just clone+patch+checkpoint GenAID
+#   STEP=warm   bash scripts/eval/eddie_eval_setup.sh   # download/cache all models (see note)
 set -uo pipefail
 
-ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ACCENT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 REPO="$(cd "$ACCENT_DIR/.." && pwd)"
 EVAL_DIR="$REPO/Evaluation"
 GENAID_ROOT="$EVAL_DIR/GenAID"
@@ -123,13 +123,13 @@ warm_caches() {
     "$ACCENT_DIR/data/prompts/GAE/gae_f.wav" \
     "$ACCENT_DIR/data/ground_truth_refs/dutch/female" > "$m"
   SGE_O_WORKDIR="$ACCENT_DIR" SGE_TASK_ID=1 HF_HUB_OFFLINE=0 \
-    bash "$ACCENT_DIR/scripts/eddie_eval_array.sh" "$m"
+    bash "$ACCENT_DIR/scripts/eval/eddie_eval_array.sh" "$m"
   echo "caches warmed. Compute-node jobs can now run offline."
 }
 
 case "$STEP" in
   all)    build_envs; setup_genaid;
-          echo; echo "envs + GenAID ready. Next (still on this internet node): STEP=warm bash scripts/eddie_eval_setup.sh";;
+          echo; echo "envs + GenAID ready. Next (still on this internet node): STEP=warm bash scripts/eval/eddie_eval_setup.sh";;
   envs)   build_envs;;
   genaid) setup_genaid;;
   warm)   warm_caches;;

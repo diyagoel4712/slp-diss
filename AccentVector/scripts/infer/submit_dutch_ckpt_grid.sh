@@ -15,14 +15,14 @@
 # model_<step>.pt which the array task slices on the fly).
 #
 # Runs on a LOGIN node (globs the Eddie ckpts dir), builds a manifest, submits ONE array job.
-#   bash scripts/submit_dutch_ckpt_grid.sh
-#   DRY_RUN=1 bash scripts/submit_dutch_ckpt_grid.sh
-#   STEP_INTERVAL=5000 SHARDS=2 MAX_CONCURRENT=12 bash scripts/submit_dutch_ckpt_grid.sh
-#   STEP_INTERVAL=0 N_CHECKPOINTS=8 bash scripts/submit_dutch_ckpt_grid.sh   (even-spacing fallback)
+#   bash scripts/infer/submit_dutch_ckpt_grid.sh
+#   DRY_RUN=1 bash scripts/infer/submit_dutch_ckpt_grid.sh
+#   STEP_INTERVAL=5000 SHARDS=2 MAX_CONCURRENT=12 bash scripts/infer/submit_dutch_ckpt_grid.sh
+#   STEP_INTERVAL=0 N_CHECKPOINTS=8 bash scripts/infer/submit_dutch_ckpt_grid.sh   (even-spacing fallback)
 set -uo pipefail
 
-ACCENT_DIR="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
-. "$(cd "$(dirname "$0")" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
+ACCENT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ACCENT_DIR"; mkdir -p logs
+. "$(cd "$(dirname "$0")/../lib" && pwd)/prompt_refs.sh"   # l1base / NATIVE_PREFIX / gdir
 
 ACCENT=dutch
 
@@ -115,7 +115,7 @@ echo "manifest: $MANIFEST  ($n_combos combos x $SHARDS shard(s) = $N tasks; $n_s
 
 QSUB=(qsub -t "1-$N" -tc "$MAX_CONCURRENT" -v "ALPHAS=$ALPHAS")
 [ -n "$RESULTS_TAG" ] && QSUB+=(-v "RESULTS_TAG=$RESULTS_TAG")
-QSUB+=(scripts/eddie_infer_array.sh "$ACCENT_DIR/$MANIFEST")
+QSUB+=(scripts/infer/eddie_infer_array.sh "$ACCENT_DIR/$MANIFEST")
 if [ "${DRY_RUN:-0}" = 1 ]; then
   echo "--- manifest rows ---"; cat "$MANIFEST"
   echo "--- would submit ---"; printf '  %q ' "${QSUB[@]}"; printf '\n'
